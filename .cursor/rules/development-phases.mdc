@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Phases
+
+The project follows a phased approach:
+
+## Phase 1: MVP - Core Simulation Loop
+- Basic end-to-end implementation with minimal features
+- Simple Python scripts with basic state management
+- CLI or simple HTML interface
+- Core LLM, RunwayML, and ElevenLabs API integration
+- 5-turn simulation loop
+- See [build-plan.md](mdc:build-plan.md) for details (Lines 10-95)
+
+## Phase 2: Agents & State Management
+- Google Agent Development Kit (GADK) implementation
+- Redis for persistent state management
+- Proper async handling of API calls
+- CreativeDirectorAgent, VideoAgent, NarrationAgent
+
+## Phase 3: Critique Loops & Error Handling
+- Self-critique capabilities for content generation
+- Robust error handling and retry logic
+- Configuration management
+
+## Phase 4: Production Front-End & Deployment
+- Vercel web UI (React/Vue)
+- Cloudflare R2 for media storage
+- Full deployment
+
+## Phase 5: Testing & Hardening
+- End-to-end testing
+- Monitoring, logging, cost controls
+- User feedback incorporation

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .scenario {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 5px solid #4caf50;
+        }
+        .conclusion-scenario {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f0f7ff;
+            border-radius: 5px;
+            border-left: 5px solid #2196f3;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .conclusion-scenario h3 {
+            color: #2196f3;
+            margin-top: 0;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .turn-counter {
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        .media-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+        }
+        video {
+            max-width: 100%;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        audio {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .response-form {
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            display: inline-block;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            color: #666;
+        }
+        .history {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .history-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .history-item h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Simulation</h1>
+        
+        <div id="error" class="error"></div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <p>Loading simulation...</p>
+        </div>
+        
+        <div id="simulation-container" style="display: none;">
+            <div class="turn-counter">
+                Turn <span id="current-turn">1</span> of <span id="max-turns">6</span>
+            </div>
+            
+            <div class="scenario" id="current-scenario">
+                <p>No active scenario. Click "Generate Scenario" to begin.</p>
+            </div>
+            
+            <div class="media-container">
+                <video id="scenario-video" controls style="display: none;">
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                
+                <audio id="scenario-audio" controls style="display: none;">
+                    <source src="" type="audio/mpeg">
+                    Your browser does not support the audio tag.
+                </audio>
+            </div>
+            
+            <div class="response-form">
+                <textarea id="user-response" placeholder="How do you respond to this situation?"></textarea>
+                <div style="display: flex; justify-content: space-between;">
+                    <button id="start-btn">Generate Scenario</button>
+                    <button id="submit-btn" disabled>Submit Response</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="history" class="history" style="display: none;">
+            <h2>Simulation History</h2>
+            <div id="history-content"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let simulationId = null;
+        let wsConnection = null;
+        let currentSimulation = null;
+        
+        // DOM elements
+        const errorElement = document.getElementById('error');
+        const loadingElement = document.getElementById('loading');
+        const simulationContainer = document.getElementById('simulation-container');
+        const currentScenarioElement = document.getElementById('current-scenario');
+        const currentTurnElement = document.getElementById('current-turn');
+        const userResponseElement = document.getElementById('user-response');
+        const startButton = document.getElementById('start-btn');
+        const submitButton = document.getElementById('submit-btn');
+        const historyElement = document.getElementById('history');
+        const historyContentElement = document.getElementById('history-content');
+        const scenarioVideoElement = document.getElementById('scenario-video');
+        const scenarioAudioElement = document.getElementById('scenario-audio');
+        
+        // Event listeners
+        startButton.addEventListener('click', startSimulation);
+        submitButton.addEventListener('click', submitResponse);
+        
+        // Initialize the UI
+        function initUI() {
+            simulationContainer.style.display = 'block';
+            startButton.innerText = 'Generate Scenario';
+            submitButton.disabled = true;
+            submitButton.style.display = 'inline-block';
+            userResponseElement.value = '';
+            userResponseElement.style.display = 'block';
+            currentScenarioElement.className = 'scenario';
+            currentScenarioElement.innerHTML = '<p>No active scenario. Click "Generate Scenario" to begin.</p>';
+            scenarioVideoElement.style.display = 'none';
+            scenarioAudioElement.style.display = 'none';
+            historyElement.style.display = 'none';
+            historyContentElement.innerHTML = '';
+            
+            // Reset turn counter display
+            currentTurnElement.textContent = '1';
+            document.getElementById('max-turns').textContent = '6';
+        }
+        
+        // Show error message
+        function showError(message) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Start a new simulation
+        async function startSimulation() {
+            // Close existing WebSocket connection if it exists
+            if (wsConnection) {
+                wsConnection.close();
+                wsConnection = null;
+            }
+            
+            try {
+                // Reset UI elements
+                userResponseElement.style.display = 'block';
+                submitButton.style.display = 'inline-block';
+                currentScenarioElement.className = 'scenario';
+                
+                // Show loading state
+                loadingElement.style.display = 'block';
+                simulationContainer.style.display = 'none';
+                historyElement.style.display = 'none';
+                startButton.disabled = true;
+                
+                // Create a new simulation
+                const response = await fetch('/api/simulations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        initial_prompt: ''
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to create simulation');
+                }
+                
+                // Parse the response
+                const data = await response.json();
+                simulationId = data.simulation_id;
+                currentSimulation = data;
+                
+                // Connect to WebSocket for real-time updates
+                connectWebSocket(simulationId);
+                
+                // Update the UI with the simulation data
+                updateUI(data);
+                
+                // Hide loading state
+                loadingElement.style.display = 'none';
+                simulationContainer.style.display = 'block';
+                historyElement.style.display = 'block';
+                startButton.innerText = 'Restart Simulation';
+                startButton.disabled = false;
+                submitButton.disabled = false;
+            } catch (error) {
+                console.error('Error starting simulation:', error);
+                showError('Failed to start simulation. Please try again.');
+                loadingElement.style.display = 'none';
+                simulationContainer.style.display = 'block';
+                startButton.disabled = false;
+            }
+        }
+        
+        // Submit a user response
+        async function submitResponse() {
+            if (!simulationId) {
+                showError('No active simulation. Please start a new simulation.');
+                return;
+            }
+            
+            const responseText = userResponseElement.value.trim();
+            if (!responseText) {
+                showError('Please enter a response.');
+                return;
+            }
+            
+            try {
+                // Show loading state
+                loadingElement.style.display = 'block';
+                submitButton.disabled = true;
+                
+                // Submit the response
+                const response = await fetch(`/api/simulations/${simulationId}/respond`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        response_text: responseText
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to submit response');
+                }
+                
+                // Parse the response
+                const data = await response.json();
+                currentSimulation = data;
+                
+                // Update the UI with the simulation data
+                updateUI(data);
+                
+                // Clear the response input
+                userResponseElement.value = '';
+                
+                // Hide loading state
+                loadingElement.style.display = 'none';
+                submitButton.disabled = false;
+                
+                // Disable submit button if simulation is complete
+                if (data.is_complete) {
+                    submitButton.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error submitting response:', error);
+                showError('Failed to submit response. Please try again.');
+                loadingElement.style.display = 'none';
+                submitButton.disabled = false;
+            }
+        }
+        
+        // Connect to WebSocket for real-time updates
+        function connectWebSocket(simId) {
+            // Close existing connection if it exists
+            if (wsConnection) {
+                wsConnection.close();
+            }
+            
+            // Create a new WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/api/ws/simulations/${simId}`;
+            wsConnection = new WebSocket(wsUrl);
+            
+            // WebSocket event handlers
+            wsConnection.onopen = () => {
+                console.log('WebSocket connection established');
+            };
+            
+            wsConnection.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'simulation_updated' || data.type === 'simulation_state') {
+                        // Update the UI with the new simulation data
+                        currentSimulation = data.simulation;
+                        updateUI(data.simulation);
+                    }
+                } catch (error) {
+                    console.error('Error processing WebSocket message:', error);
+                }
+            };
+            
+            wsConnection.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            wsConnection.onclose = () => {
+                console.log('WebSocket connection closed');
+            };
+        }
+        
+        // Update the UI with simulation data
+        function updateUI(simulation) {
+            // Update turn counter
+            currentTurnElement.textContent = simulation.current_turn_number;
+            document.getElementById('max-turns').textContent = simulation.max_turns;
+            
+            // Get the current turn
+            const currentTurn = simulation.turns.find(turn => turn.turn_number === simulation.current_turn_number);
+            
+            if (currentTurn && currentTurn.selected_scenario) {
+                // Check if this is the final turn
+                const isFinalTurn = simulation.current_turn_number === simulation.max_turns;
+                
+                // Update scenario description with special styling for final turn
+                if (isFinalTurn) {
+                    currentScenarioElement.className = 'conclusion-scenario';
+                    currentScenarioElement.innerHTML = `
+                        <h3>Grand Finale</h3>
+                        <p>${currentTurn.selected_scenario.situation_description}</p>
+                        <p><em>Thank you for participating in this absurd adventure!</em></p>
+                    `;
+                } else {
+                    currentScenarioElement.className = 'scenario';
+                    currentScenarioElement.innerHTML = `<p>${currentTurn.selected_scenario.situation_description}</p>`;
+                }
+                
+                // Update media elements if available
+                if (currentTurn.video_url) {
+                    scenarioVideoElement.src = currentTurn.video_url;
+                    scenarioVideoElement.style.display = 'block';
+                } else {
+                    scenarioVideoElement.style.display = 'none';
+                }
+                
+                if (currentTurn.audio_url) {
+                    scenarioAudioElement.src = currentTurn.audio_url;
+                    scenarioAudioElement.style.display = 'block';
+                } else {
+                    scenarioAudioElement.style.display = 'none';
+                }
+            }
+            
+            // Update history
+            updateHistory(simulation);
+            
+            // Enable/disable submit button based on simulation state
+            submitButton.disabled = simulation.is_complete;
+            
+            // Show a completion message if the simulation is complete
+            if (simulation.is_complete) {
+                userResponseElement.style.display = 'none';
+                submitButton.style.display = 'none';
+                startButton.innerText = 'Start New Simulation';
+            }
+        }
+        
+        // Update the history section
+        function updateHistory(simulation) {
+            // Show history container
+            historyElement.style.display = 'block';
+            
+            // Clear existing history
+            historyContentElement.innerHTML = '';
+            
+            // Add history items for each turn (except current turn)
+            simulation.turns
+                .filter(turn => turn.turn_number < simulation.current_turn_number && turn.selected_scenario && turn.user_response)
+                .forEach(turn => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    historyItem.innerHTML = `
+                        <h3>Turn ${turn.turn_number}</h3>
+                        <p><strong>Situation:</strong> ${turn.selected_scenario.situation_description}</p>
+                        <p><strong>Your Response:</strong> ${turn.user_response.response_text}</p>
+                    `;
+                    
+                    historyContentElement.appendChild(historyItem);
+                });
+            
+            // If no history items, show a message
+            if (historyContentElement.children.length === 0) {
+                historyContentElement.innerHTML = '<p>No history yet. Complete your first turn to see the history.</p>';
+            }
+        }
+        
+        // Initialize the UI on page load
+        window.addEventListener('DOMContentLoaded', initUI);
+    </script>
+</body>
+</html> 

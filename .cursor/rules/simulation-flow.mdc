@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Simulation Flow
+
+The core simulation consists of a 5-turn interaction loop:
+
+1. **Generate Scenarios** - LLM 1 (create_idea)
+   - Creates 5 potential scenario situations
+   - Takes previous context as input (or initial prompt for first turn)
+
+2. **Select Best Scenario** - LLM 2 (critique_idea)
+   - Evaluates and selects the best of the 5 scenarios
+   - Returns single selected situation
+
+3. **Generate Media**
+   - LLM 3 (create_video_prompt): Creates video generation prompt
+   - LLM 4 (create_narration_script): Creates narration script
+   - External APIs generate video (RunwayML) and audio (ElevenLabs)
+
+4. **User Interaction**
+   - Present situation, video, and audio to user
+   - Collect user response
+   - Update context with previous situation and user action
+
+5. **Loop Continuation**
+   - Repeat steps 1-4 for a total of 5 turns
+   - Each turn builds on previous context
+
+See [flow.md](mdc:flow.md) for detailed process flow.

@@ -1,0 +1,12 @@
+langchain
+langchain-openai
+langchain-groq
+openai
+python-dotenv
+requests
+pydantic
+redis
+fastapi
+uvicorn
+elevenlabs
+runwayml

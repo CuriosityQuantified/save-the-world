@@ -1,0 +1,73 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## General Principles
+
+- **Modularity:**  
+  Break your code into small, focused modules that encapsulate single responsibilities. This promotes reuse, easier testing, and independent updates.
+  
+- **DRY (Don't Repeat Yourself):**  
+  Centralize common functionality in utility modules or shared libraries. Avoid duplicate code across different parts of the application.
+
+- **Simplicity and Minimalism:**  
+  Build for the MVP first. Implement just enough functionality to be useful now, with clear extension points for later enhancements. Resist over-engineering.
+
+- **Absolute Path Imports:**  
+  Use absolute imports instead of relative ones to improve code clarity and ease refactoring.
+  
+- **Clear Folder Structure:**  
+  Organize the project in a logical hierarchy that reflects functionality and domain responsibility. Always search for files before creating a new file to avoid duplication
+
+- **Consistent Documentation & Comments:**  
+  Document key modules, functions, and APIs. Use in-line comments where necessary and maintain external documentation for architecture decisions and API contracts.
+
+- **Testing Guidelines:**  
+  Constantly test code with unit tests. Keep all tests in a dedicated folder. Aim to be test-driven with code creation and implementation. Do not mock workflows in tests - always test the production components.
+---
+
+### Code Quality & Best Practices
+
+- **Component Design:**
+- Ensure components are stateless where possible.
+- Break down complex components into smaller parts.
+
+- **Testing:**
+- Use pytest for unit tests and integration tests.
+- Ensure core functionality (API endpoints, queue processing, LLM interactions) is well-covered by tests.
+- Create integration tests for critical UI flows.
+- Constantly test code with unit tests. 
+- Keep all tests in a dedicated folder. 
+- Aim to be test-driven with code creation and implementation. 
+- Do not mock workflows in tests; always test the production components.
+
+- **Error Handling & Logging:**
+- Utilize Python’s logging module to capture detailed logs.
+- Implement robust error handling for API endpoints and background tasks.
+- Maintain an audit trail for data changes and API interactions.
+
+---
+
+## Continuous Integration / Continuous Deployment (CI/CD)
+
+- **Automated Testing:**
+- Integrate tests into your CI pipeline (e.g., GitHub Actions).
+- Run unit and integration tests on each pull request before merging.
+
+- **Version Control:**
+- Use Git for version control.
+- Follow a clear branching strategy (e.g., main for production-ready code, develop for ongoing work).
+
+---
+
+## Final Notes
+
+- **Documentation:**  
+Always update relevant documentation as new features or changes are made.
+- **Iterate Slowly:**  
+Remember the MVP is just the start. Build the core functionality without over-engineering and extend as user feedback and requirements evolve.
+- **Collaboration:**  
+Use pull requests and code reviews to ensure adherence to these guidelines and to share knowledge across the team.
+
+---
