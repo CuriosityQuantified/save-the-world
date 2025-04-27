@@ -130,7 +130,7 @@ class SimulationOrchestrator:
             "video_url": self.context.get("video_url", ""),
             "audio_url": self.context.get("audio_url", ""),
             "video_prompt": self.context.get("video_prompt", ""),
-            "narration_script": self.context.get("narration_script", "")
+            "narration_text": self.context.get("narration_text", "")
         }
         
         self.context["turn_history"].append(turn_data)

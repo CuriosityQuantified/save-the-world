@@ -26,7 +26,7 @@ This plan outlines the development stages, starting with an MVP to validate the 
 * ✅ Basic testing framework
   - Created test script to verify scenario generation flow
   - Implemented simulation of the 5-turn interactive loop
-  - Successfully tested with Llama 4 model
+  - Successfully tested with compound-beta-mini model
 * ✅ Full end-to-end simulation flow
   - Implemented scenario selection (critique_idea)
   - Added scenario generation, selection, and user response handling
@@ -38,15 +38,29 @@ This plan outlines the development stages, starting with an MVP to validate the 
 * ✅ State management
   - Implemented in-memory state service for tracking simulation progress
   - Added proper state transition between turns
+* ✅ Web UI development
+  - Created responsive dark-themed UI with modern styling
+  - Implemented real-time updates via WebSockets
+  - Added history view for previous turns
+* ✅ Developer mode
+  - Implemented detailed LLM interaction logging
+  - Created collapsible log panels in the UI
+  - Added toggleable developer mode for debugging
+* ✅ Scenario selection improvements
+  - Updated critique_idea to properly select best scenario
+  - Fixed issue with first scenario always being selected
+  - Improved error handling for scenario matching
 
 **In Progress:**
+* 🔄 Multi-model support for different LLM operations
+  - Using different models for scenario generation vs. selection
+  - Implementing numbered scenario selection (1-5) instead of text matching
 * 🔄 Integration with RunwayML and ElevenLabs APIs
-* 🔄 Simple web UI for user interaction
 
 **Next Steps:**
 * ⏩ Complete media generation integration
-* ⏩ Implement frontend interface
-* ⏩ Add error handling and robustness
+* ⏩ Add comprehensive error handling and retry mechanisms
+* ⏩ Implement proper testing for all components
 * ⏩ Deploy to production environment
 
 ### Phase 1: MVP - Core Simulation Loop & API Integration

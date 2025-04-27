@@ -1,0 +1,15 @@
+# Cloudflare R2 Storage Configuration
+# Add these lines to your .env file
+
+# Required credentials
+CLOUDFLARE_R2_ENDPOINT=https://789c636162cba763a91bce6eae81076d.r2.cloudflarestorage.com
+CLOUDFLARE_R2_BUCKET_NAME=save-the-world
+CLOUDFLARE_R2_ACCESS_KEY_ID=your_cloudflare_r2_access_key_id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_cloudflare_r2_secret_access_key
+
+# Optional settings
+# Set to 'true' for public access (default) or 'false' for private access with signed URLs
+CLOUDFLARE_R2_PUBLIC_ACCESS=true
+
+# Expiry time in seconds for signed URLs when using private access (default: 3600 = 1 hour)
+CLOUDFLARE_R2_URL_EXPIRY=3600 

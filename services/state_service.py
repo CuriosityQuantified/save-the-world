@@ -77,4 +77,13 @@ class StateService:
         Returns:
             A list of all SimulationState objects
         """
+        return list(self.simulations.values())
+    
+    def get_all_simulations(self) -> List[SimulationState]:
+        """
+        Get all simulations.
+        
+        Returns:
+            A list of all SimulationState objects
+        """
         return list(self.simulations.values()) 

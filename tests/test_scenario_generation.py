@@ -31,7 +31,7 @@ async def test_scenario_generation():
     
     # Initialize the LLM service
     llm_service = LLMService(api_key=api_key)
-    print(f"Initialized LLM service with model: {llm_service.model_name}")
+    print(f"Initialized LLM service with model: {llm_service.default_model_name}")
     
     # User clicks "Generate Scenario" button - minimal context needed
     print("\n=== User clicks 'Generate Scenario' button ===")
@@ -39,19 +39,18 @@ async def test_scenario_generation():
         "simulation_history": "",  # Empty for first turn
         "current_turn_number": 1,
         "previous_turn_number": 0,
-        "user_prompt_for_this_turn": "",  # No specific user input
-        "num_ideas": 5  # Generate 5 ideas as per requirements
+        "user_prompt_for_this_turn": ""  # No specific user input
     }
     
-    print("Generating initial scenarios...")
-    scenarios = await llm_service.create_idea(initial_context)
+    print("Generating initial scenario...")
+    scenario = await llm_service.create_idea(initial_context)
     
-    # Display the generated scenarios
-    print(f"\nGenerated {len(scenarios)} scenario ideas:")
-    print(json.dumps(scenarios, indent=2))
+    # Display the generated scenario
+    print(f"\nGenerated scenario idea:")
+    print(json.dumps(scenario, indent=2))
     
-    # Simulate selecting the first scenario
-    selected_scenario = scenarios[0]
+    # Use the scenario directly
+    selected_scenario = scenario
     print(f"\n=== System selects scenario: {selected_scenario['id']} ===")
     print(f"Selected scenario: {selected_scenario['situation_description']}")
     
@@ -73,16 +72,15 @@ async def test_scenario_generation():
         "simulation_history": simulation_history,
         "current_turn_number": 2,
         "previous_turn_number": 1,
-        "user_prompt_for_this_turn": "",  # No specific direction
-        "num_ideas": 5  # Generate 5 follow-up ideas as per requirements
+        "user_prompt_for_this_turn": ""  # No specific direction
     }
     
-    print("Generating follow-up scenarios...")
-    follow_up_scenarios = await llm_service.create_idea(follow_up_context)
+    print("Generating follow-up scenario...")
+    follow_up_scenario = await llm_service.create_idea(follow_up_context)
     
-    # Display the generated follow-up scenarios
-    print(f"\nGenerated {len(follow_up_scenarios)} follow-up scenario ideas:")
-    print(json.dumps(follow_up_scenarios, indent=2))
+    # Display the generated follow-up scenario
+    print(f"\nGenerated follow-up scenario idea:")
+    print(json.dumps(follow_up_scenario, indent=2))
 
 if __name__ == "__main__":
     asyncio.run(test_scenario_generation()) 

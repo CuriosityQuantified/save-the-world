@@ -54,23 +54,77 @@ def init_services():
         groq_api_key = os.getenv("GROQ_API_KEY")
         runway_api_key = os.getenv("RUNWAY_API_KEY")
         elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
+        gemini_api_key = os.getenv("GOOGLE_API_KEY")  # Look for Google API key for Gemini
+        huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")  # Get HuggingFace API key
+        
+        # Get Cloudflare R2 credentials
+        cloudflare_r2_endpoint = os.getenv("CLOUDFLARE_R2_ENDPOINT")
+        cloudflare_r2_access_key_id = os.getenv("CLOUDFLARE_R2_ACCESS_KEY_ID")
+        cloudflare_r2_secret_access_key = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
+        cloudflare_r2_bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET_NAME")
+        
+        # Get optional R2 settings with defaults
+        cloudflare_r2_public_access = os.getenv("CLOUDFLARE_R2_PUBLIC_ACCESS", "true").lower() == "true"
+        try:
+            cloudflare_r2_url_expiry = int(os.getenv("CLOUDFLARE_R2_URL_EXPIRY", "3600"))
+        except ValueError:
+            cloudflare_r2_url_expiry = 3600  # Default to 1 hour if invalid value
         
         if not groq_api_key:
             logger.warning("GROQ_API_KEY not found in environment. LLM service will not work correctly.")
             groq_api_key = "dummy_key"
             
-        if not runway_api_key:
-            logger.warning("RUNWAY_API_KEY not found in environment. Video generation will be mocked.")
-            runway_api_key = "dummy_key"
+        if not huggingface_api_key:
+            logger.warning("HUGGINGFACE_API_KEY not found in environment. HuggingFace video generation will be mocked.")
+            huggingface_api_key = "dummy_key"
+            # Check if we have RunwayML as fallback
+            if not runway_api_key:
+                logger.warning("RUNWAY_API_KEY not found in environment. No video generation will be available.")
+                runway_api_key = "dummy_key"
+            else:
+                logger.info("Using RunwayML as fallback for video generation.")
+        else:
+            logger.info("HuggingFace API key found. Using HuggingFace for video generation.")
             
         if not elevenlabs_api_key:
             logger.warning("ELEVENLABS_API_KEY not found in environment. Audio generation will be mocked.")
             elevenlabs_api_key = "dummy_key"
+            
+        if not gemini_api_key:
+            logger.warning("GOOGLE_API_KEY not found in environment. Gemini model will not be available, using Groq as primary.")
+        else:
+            logger.info("Google API key found. Gemini model will be used as primary LLM.")
+        
+        # Check for Cloudflare R2 credentials
+        if not all([
+            cloudflare_r2_endpoint,
+            cloudflare_r2_access_key_id, 
+            cloudflare_r2_secret_access_key,
+            cloudflare_r2_bucket_name
+        ]):
+            logger.warning("Cloudflare R2 credentials incomplete or missing. Videos will not be persistently stored.")
+        else:
+            logger.info(f"Cloudflare R2 credentials found. Videos will be stored in R2 (Public access: {cloudflare_r2_public_access}).")
         
         # Initialize services
-        llm_service = LLMService(groq_api_key)
+        # Use Gemini as primary and qwen-qwq-32b as the backup model
+        llm_service = LLMService(
+            api_key=groq_api_key,
+            default_model_name="qwen-qwq-32b",
+            google_api_key=gemini_api_key
+        )
         state_service = StateService()
-        media_service = MediaService(runway_api_key, elevenlabs_api_key)
+        media_service = MediaService(
+            huggingface_api_key=huggingface_api_key, 
+            elevenlabs_api_key=elevenlabs_api_key,
+            runway_api_key=runway_api_key,  # Keep RunwayML as fallback
+            cloudflare_r2_endpoint=cloudflare_r2_endpoint,
+            cloudflare_r2_access_key_id=cloudflare_r2_access_key_id,
+            cloudflare_r2_secret_access_key=cloudflare_r2_secret_access_key,
+            cloudflare_r2_bucket_name=cloudflare_r2_bucket_name,
+            cloudflare_r2_public_access=cloudflare_r2_public_access,
+            cloudflare_r2_url_expiry=cloudflare_r2_url_expiry
+        )
         
         # Create simulation service
         simulation_service = SimulationService(
@@ -97,9 +151,4 @@ async def startup_event():
 app.include_router(router, prefix="/api")
 
 # Mount static files for the frontend
-app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")
-
-# For debugging - remove in production
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui") 

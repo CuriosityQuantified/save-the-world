@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from typing import Dict, Any, List, Optional
 import logging
 import json
-from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder
+from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest
 
 from services.simulation_service import SimulationService
 
@@ -44,7 +44,10 @@ async def create_simulation(
         The newly created SimulationState
     """
     try:
-        simulation = await simulation_service.create_new_simulation(request.initial_prompt)
+        simulation = await simulation_service.create_new_simulation(
+            request.initial_prompt, 
+            developer_mode=request.developer_mode
+        )
         return simulation
     except Exception as e:
         logger.error(f"Error creating simulation: {str(e)}")
@@ -105,6 +108,43 @@ async def submit_response(
     except Exception as e:
         logger.error(f"Error processing response: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process response: {str(e)}")
+
+@router.post("/simulations/{simulation_id}/developer-mode", response_model=SimulationState)
+async def toggle_developer_mode(
+    simulation_id: str,
+    request: DeveloperModeRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service)
+):
+    """
+    Toggle developer mode for a simulation.
+    
+    Args:
+        simulation_id: The ID of the simulation
+        request: The developer mode settings
+        
+    Returns:
+        The updated SimulationState
+    """
+    try:
+        simulation = await simulation_service.toggle_developer_mode(simulation_id, request.enabled)
+        if not simulation:
+            raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
+        
+        # Notify WebSocket clients about the update
+        if simulation_id in active_connections:
+            for connection in active_connections[simulation_id]:
+                try:
+                    await connection.send_text(json.dumps({
+                        "type": "simulation_updated",
+                        "simulation": simulation.dict()
+                    }, cls=DateTimeEncoder))
+                except Exception as e:
+                    logger.error(f"Error sending WebSocket update: {str(e)}")
+        
+        return simulation
+    except Exception as e:
+        logger.error(f"Error toggling developer mode: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to toggle developer mode: {str(e)}")
 
 @router.get("/simulations", response_model=List[SimulationState])
 async def list_simulations(

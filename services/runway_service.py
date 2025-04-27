@@ -11,7 +11,7 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any
 import requests
-from runwayml import RunwayModel
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -22,43 +22,51 @@ class RunwayService:
     Provides methods for submitting video generation jobs and retrieving results.
     """
     
-    def __init__(self, api_key: str, model_id: str = "text-to-video"):
+    def __init__(self, api_key: str):
         """
         Initialize the RunwayML service.
         
         Args:
             api_key: The RunwayML API key
-            model_id: The model ID to use for generation
         """
         self.api_key = api_key
-        self.model_id = model_id
-        self.model = RunwayModel(self.model_id, api_key=self.api_key)
-        self.base_url = "https://api.runwayml.com/v1"
+        # Update the base URL to use v2 of the API
+        self.base_url = "https://api.runwayml.com/v2"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
     
-    async def submit_job(self, prompt: str) -> str:
+    async def submit_job(self, prompt: str, image_url: Optional[str] = None, duration: int = 10) -> str:
         """
-        Submit a video generation job to RunwayML.
+        Submit a video generation job to RunwayML using Gen-4 Turbo model.
         
         Args:
             prompt: The text prompt for video generation
+            image_url: Optional URL to an image to use as the initial frame
+            duration: Duration in seconds (5 or 10)
             
         Returns:
             Job ID for tracking the generation progress
         """
         try:
-            # The actual implementation would use the runwayml package
-            # This is a simplified version using requests
-            response = await self._submit_generation_request(prompt)
-            return response.get("id")
+            if duration not in [5, 10]:
+                logger.warning(f"Invalid duration: {duration}. Using default 10 seconds.")
+                duration = 10
+                
+            response = await self._submit_generation_request(prompt, image_url, duration)
+            job_id = response.get("id")
+            if not job_id:
+                logger.error(f"No job ID in response: {response}")
+                raise ValueError("No job ID returned from RunwayML API")
+                
+            logger.info(f"Successfully submitted RunwayML job: {job_id}")
+            return job_id
         except Exception as e:
             logger.error(f"Error submitting RunwayML job: {e}")
             raise
     
-    async def get_result(self, job_id: str, max_retries: int = 30, retry_delay: int = 5) -> str:
+    async def get_result(self, job_id: str, max_retries: int = 60, retry_delay: int = 5) -> str:
         """
         Poll for and retrieve the result of a video generation job.
         
@@ -74,18 +82,24 @@ class RunwayService:
             try:
                 status = await self._check_generation_status(job_id)
                 
-                if status.get("status") == "COMPLETED":
-                    video_url = status.get("output", {}).get("video", "")
-                    if video_url:
+                # Update status check to match v2 API response format
+                if status.get("status") == "completed":
+                    # For Gen-4 Turbo, the output should be in the data field
+                    output = status.get("output", {})
+                    videos = output.get("video", []) if isinstance(output, dict) else []
+                    
+                    if videos and len(videos) > 0:
+                        video_url = videos[0]  # Take the first video URL
+                        logger.info(f"Video generation completed. URL: {video_url}")
                         return video_url
                     raise ValueError("No video URL in completed response")
                 
-                if status.get("status") == "FAILED":
+                if status.get("status") == "failed":
                     error_message = status.get("error", "Unknown error")
                     raise RuntimeError(f"RunwayML job failed: {error_message}")
                 
                 # Still processing, wait and retry
-                logger.info(f"Job {job_id} still processing. Attempt {attempt+1}/{max_retries}")
+                logger.info(f"Job {job_id} still processing. Status: {status.get('status')}. Attempt {attempt+1}/{max_retries}")
                 await asyncio.sleep(retry_delay)
                 
             except Exception as e:
@@ -94,28 +108,37 @@ class RunwayService:
         
         raise TimeoutError(f"Max retries ({max_retries}) exceeded waiting for RunwayML job {job_id}")
     
-    async def _submit_generation_request(self, prompt: str) -> Dict[str, Any]:
+    async def _submit_generation_request(self, prompt: str, image_url: Optional[str] = None, duration: int = 10) -> Dict[str, Any]:
         """
-        Submit the actual generation request to RunwayML API.
+        Submit the generation request to RunwayML Gen-4 Turbo API.
         
         Args:
             prompt: The text prompt for video generation
+            image_url: Optional URL to an image to use as the initial frame
+            duration: Duration in seconds (5 or 10)
             
         Returns:
             API response containing job information
         """
-        # For simplicity, we're using a synchronous request here
-        # In a production environment, you would use aiohttp or similar
+        # Update to use the v2 API endpoint for Gen-4 Turbo
         url = f"{self.base_url}/generations"
+        
+        # Update payload format to match v2 API expectations
         payload = {
-            "model": self.model_id,
+            "model": "runway/gen4_turbo",  # Updated model identifier format
             "input": {
                 "prompt": prompt,
-                "num_frames": 24,
-                "fps": 8,
-                "quality": "high"
+                "duration": duration,  # 10 seconds as requested
+                "aspect_ratio": "16:9"  # Default aspect ratio, can be customized
             }
         }
+        
+        # Add image_url if provided
+        if image_url:
+            payload["input"]["image_url"] = image_url
+        
+        logger.info(f"Submitting generation request to: {url}")
+        logger.debug(f"Request payload: {json.dumps(payload)}")
         
         # Simulate async behavior for this example
         loop = asyncio.get_event_loop()
@@ -124,8 +147,10 @@ class RunwayService:
             lambda: requests.post(url, headers=self.headers, json=payload)
         )
         
-        if response.status_code != 200:
-            raise RuntimeError(f"RunwayML API error: {response.text}")
+        if response.status_code not in [200, 201, 202]:
+            error_msg = f"RunwayML API error: {response.status_code} - {response.text}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
             
         return response.json()
     
@@ -141,6 +166,8 @@ class RunwayService:
         """
         url = f"{self.base_url}/generations/{job_id}"
         
+        logger.debug(f"Checking generation status at: {url}")
+        
         # Simulate async behavior for this example
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
@@ -149,6 +176,8 @@ class RunwayService:
         )
         
         if response.status_code != 200:
-            raise RuntimeError(f"RunwayML API error checking status: {response.text}")
+            error_msg = f"RunwayML API error checking status: {response.status_code} - {response.text}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
             
         return response.json() 

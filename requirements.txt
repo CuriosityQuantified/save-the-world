@@ -10,3 +10,12 @@ fastapi
 uvicorn
 elevenlabs
 runwayml
+groq
+pytest
+pytest-asyncio
+google-genai>=0.3.0
+google-adk
+aiohttp
+huggingface_hub>=0.21.0
+boto3>=1.35.0
+botocore>=1.35.0

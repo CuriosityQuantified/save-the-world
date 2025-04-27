@@ -10,11 +10,23 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
+class LLMLog(BaseModel):
+    """Model representing a log of an LLM interaction."""
+    operation_name: str
+    prompt: str
+    completion: str
+    model_name: str
+    parameters: Dict[str, Any] = {}
+    response_time_seconds: Optional[float] = None  # Response time in seconds
+    timestamp: datetime = Field(default_factory=datetime.now)
+
 class Scenario(BaseModel):
     """Model representing a single scenario in the simulation."""
     id: str
     situation_description: str
     rationale: str
+    user_role: Optional[str] = ""
+    user_prompt: Optional[str] = ""
 
 class UserResponse(BaseModel):
     """Model representing a user's response to a scenario."""
@@ -32,6 +44,7 @@ class SimulationTurn(BaseModel):
     narration_script: Optional[str] = None
     video_url: Optional[str] = None
     audio_url: Optional[str] = None
+    llm_logs: List[LLMLog] = []  # New field to store LLM logs for this turn
     timestamp: datetime = Field(default_factory=datetime.now)
 
 class SimulationState(BaseModel):
@@ -43,6 +56,7 @@ class SimulationState(BaseModel):
     is_complete: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    developer_mode: bool = False  # Flag to enable/disable developer mode
     
     def dict(self, *args, **kwargs):
         """
@@ -64,6 +78,11 @@ class SimulationState(BaseModel):
                 if 'user_response' in turn and turn['user_response']:
                     if 'timestamp' in turn['user_response'] and isinstance(turn['user_response']['timestamp'], datetime):
                         turn['user_response']['timestamp'] = turn['user_response']['timestamp'].isoformat()
+                # Process LLM logs in turn
+                if 'llm_logs' in turn and turn['llm_logs']:
+                    for log in turn['llm_logs']:
+                        if 'timestamp' in log and isinstance(log['timestamp'], datetime):
+                            log['timestamp'] = log['timestamp'].isoformat()
                         
         return result
     
@@ -86,6 +105,10 @@ class SimulationState(BaseModel):
             if turn.selected_scenario:
                 history_text += f"TURN {turn.turn_number}:\n"
                 history_text += f"SITUATION: {turn.selected_scenario.situation_description}\n"
+                if turn.selected_scenario.user_role:
+                    history_text += f"USER ROLE: {turn.selected_scenario.user_role}\n"
+                if turn.selected_scenario.user_prompt:
+                    history_text += f"USER PROMPT: {turn.selected_scenario.user_prompt}\n"
                 
                 if turn.user_response:
                     history_text += f"USER RESPONSE: {turn.user_response.response_text}\n\n"
@@ -178,11 +201,32 @@ class SimulationState(BaseModel):
             if audio_url:
                 turn.audio_url = audio_url
             self.updated_at = datetime.now()
+    
+    def add_llm_log(self, turn_number: int, llm_log: LLMLog) -> None:
+        """
+        Adds an LLM interaction log to the specified turn.
+        
+        Args:
+            turn_number: The turn number to add the log to
+            llm_log: The LLM log to add
+        """
+        turn = next((t for t in self.turns if t.turn_number == turn_number), None)
+        if not turn:
+            turn = SimulationTurn(turn_number=turn_number)
+            self.turns.append(turn)
+            
+        turn.llm_logs.append(llm_log)
+        self.updated_at = datetime.now()
 
 class SimulationRequest(BaseModel):
     """Model for requesting a new simulation."""
     initial_prompt: Optional[str] = None
+    developer_mode: bool = False  # Flag to enable developer mode
     
 class UserResponseRequest(BaseModel):
     """Model for submitting a user response."""
-    response_text: str 
+    response_text: str
+
+class DeveloperModeRequest(BaseModel):
+    """Model for toggling developer mode."""
+    enabled: bool 

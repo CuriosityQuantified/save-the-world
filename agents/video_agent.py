@@ -33,7 +33,7 @@ class VideoAgent(BaseAgent):
         """
         Execute the Video Agent workflow:
         1. Generate video prompt from scenario
-        2. Submit job to RunwayML
+        2. Submit job to RunwayML Gen-4 Turbo
         3. Wait for and retrieve the generated video
         
         Args:
@@ -49,8 +49,11 @@ class VideoAgent(BaseAgent):
         video_prompt = await self._generate_video_prompt(context["selected_scenario"])
         context["video_prompt"] = video_prompt
         
-        # Submit job to RunwayML
-        job_id = await self.runway_service.submit_job(video_prompt)
+        # Submit job to RunwayML Gen-4 Turbo - 10-second video duration
+        job_id = await self.runway_service.submit_job(
+            prompt=video_prompt,
+            duration=10  # Using 10 seconds as specified
+        )
         context["video_job_id"] = job_id
         
         # Wait for video generation to complete
@@ -59,14 +62,15 @@ class VideoAgent(BaseAgent):
         
         return context
     
-    async def _generate_video_prompt(self, scenario: str) -> str:
+    async def _generate_video_prompt(self, scenario: Dict[str, Any]) -> str:
         """
         Generate a video prompt from the scenario description.
         
         Args:
-            scenario: The scenario description
+            scenario: The scenario dictionary
             
         Returns:
-            A prompt optimized for RunwayML video generation
+            A prompt optimized for RunwayML Gen-4 Turbo video generation
         """
-        return await self.llm_service.create_video_prompt(scenario) 
+        # Make sure this passes the correct format of scenario object to LLM service
+        return await self.llm_service.create_video_prompt(scenario, turn_number=1) 
