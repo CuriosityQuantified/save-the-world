@@ -10,13 +10,13 @@ app.prepare().then(() => {
   const server = express();
 
   // Set up static middleware for media files
-  server.use('/media', express.static(path.join(__dirname, 'media')));
+  server.use('/sim-local/public/media', express.static(path.join(__dirname, '/sim-local/public/media')));
   
   // For videos specifically - ensuring they're properly served
-  server.use('/media/videos', express.static(path.join(__dirname, 'media/videos')));
+  server.use('/sim-local/public/media/videos', express.static(path.join(__dirname, '/sim-local/public/media/videos')));
   
   // For audio files
-  server.use('/media/audio', express.static(path.join(__dirname, 'media/audio')));
+  server.use('/sim-local/public/media/audio', express.static(path.join(__dirname, '/sim-local/public/media/audio')));
 
   // Handle all other routes with Next.js
   server.all('*', (req, res) => {

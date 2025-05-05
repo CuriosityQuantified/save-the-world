@@ -227,77 +227,90 @@ async def websocket_endpoint(
 async def debug_media_check():
     """
     Debug endpoint to check media directories and files.
-    Verifies that media directories exist and lists files in them.
+    Verifies that media directories exist and lists files in them,
+    based on the configuration in api/app.py.
     """
     import os
-    from utils.media import ensure_media_directories
+    from api.app import PROJECT_ROOT  # Import PROJECT_ROOT from app.py
     
-    # Ensure media directories exist
-    try:
-        ensure_media_directories()
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Failed to create media directories: {str(e)}"}
-        )
+    # Define base media directory using PROJECT_ROOT
+    media_base_dir = os.path.join(PROJECT_ROOT, "public", "media")
     
     # Check video directory
-    video_dir = os.path.join(os.getcwd(), "media", "videos")
+    video_dir = os.path.join(media_base_dir, "videos")
     videos = []
-    if os.path.exists(video_dir):
-        for filename in os.listdir(video_dir):
-            file_path = os.path.join(video_dir, filename)
-            if os.path.isfile(file_path):
-                videos.append({
-                    "filename": filename,
-                    "path": file_path,
-                    "size": os.path.getsize(file_path),
-                    "url": f"/media/videos/{filename}"
-                })
+    try:
+        os.makedirs(video_dir, exist_ok=True) # Ensure dir exists for check
+        if os.path.exists(video_dir):
+            for filename in os.listdir(video_dir):
+                file_path = os.path.join(video_dir, filename)
+                if os.path.isfile(file_path):
+                    videos.append({
+                        "filename": filename,
+                        "path": file_path,
+                        "size": os.path.getsize(file_path),
+                        "url": f"/media/videos/{filename}" # URL remains the same
+                    })
+    except Exception as e:
+        logger.error(f"Error accessing video directory {video_dir}: {e}")
     
     # Check audio directory
-    audio_dir = os.path.join(os.getcwd(), "media", "audio")
+    audio_dir = os.path.join(media_base_dir, "audio")
     audios = []
-    if os.path.exists(audio_dir):
-        for filename in os.listdir(audio_dir):
-            file_path = os.path.join(audio_dir, filename)
-            if os.path.isfile(file_path):
-                audios.append({
-                    "filename": filename,
-                    "path": file_path,
-                    "size": os.path.getsize(file_path),
-                    "url": f"/media/audio/{filename}"
-                })
-    
-    # Check configured media mounts
-    from fastapi import FastAPI
-    app = router.app
+    try:
+        os.makedirs(audio_dir, exist_ok=True) # Ensure dir exists for check
+        if os.path.exists(audio_dir):
+            for filename in os.listdir(audio_dir):
+                file_path = os.path.join(audio_dir, filename)
+                if os.path.isfile(file_path):
+                    audios.append({
+                        "filename": filename,
+                        "path": file_path,
+                        "size": os.path.getsize(file_path),
+                        "url": f"/sim-local/public/media/audio/{filename}" # URL remains the same
+                    })
+    except Exception as e:
+        logger.error(f"Error accessing audio directory {audio_dir}: {e}")
+
+    # Check configured media mounts (this part can remain as is)
+    app = router.app 
     mounts = []
+    static_mounts = {}
     for route in app.routes:
-        if hasattr(route, "path") and hasattr(route, "name"):
-            if route.name in ["media", "static", "ui"]:
-                mounts.append({
-                    "name": route.name,
-                    "path": route.path
-                })
-    
+        # Check specifically for StaticFiles routes
+        if isinstance(route, Mount) and isinstance(route.app, StaticFiles):
+            mount_path = route.path
+            directory = str(route.app.directory) # Get the configured directory path
+            mounts.append({
+                "name": route.name,
+                "path": mount_path,
+                "directory": directory
+            })
+            if route.name == "media_audio":
+                static_mounts["audio"] = {"path": mount_path, "directory": directory}
+            elif route.name == "media_videos":
+                static_mounts["video"] = {"path": mount_path, "directory": directory}
+            elif route.name == "ui":
+                static_mounts["ui"] = {"path": mount_path, "directory": directory}
+
     return {
-        "media_directories": {
+        "checked_directories": {
             "videos": {
                 "exists": os.path.exists(video_dir),
-                "path": video_dir,
+                "path_checked": video_dir,
                 "file_count": len(videos)
             },
             "audio": {
                 "exists": os.path.exists(audio_dir),
-                "path": audio_dir,
+                "path_checked": audio_dir,
                 "file_count": len(audios)
             }
         },
-        "media_files": {
+        "found_files": {
             "videos": videos,
             "audio": audios
         },
-        "media_mounts": mounts,
-        "working_directory": os.getcwd()
+        "configured_static_mounts": static_mounts,
+        "project_root": PROJECT_ROOT,
+        "working_directory": os.getcwd() # Keep reporting CWD for context
     } 

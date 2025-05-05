@@ -4,8 +4,8 @@ import MediaHandler from '../components/MediaHandler';
 
 export default function MediaTestPage() {
   // Direct test URLs for debugging
-  const testVideoUrl = "/media/videos/sample_video.mp4";
-  const testAudioUrl = "/media/audio/sample_audio.mp3";
+  const testVideoUrl = "/sim-local/public/media/videos/sample_video.mp4";
+  const testAudioUrl = "/sim-local/public/media/audio/sample_audio.mp3";
 
   return (
     <div className="container">

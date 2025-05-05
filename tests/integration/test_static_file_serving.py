@@ -16,6 +16,8 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import logging
+import sys
+from dotenv import load_dotenv
 
 from api.app import app
 from utils.media import ensure_media_directories
@@ -23,6 +25,14 @@ from utils.media import ensure_media_directories
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables from the project root .env file
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
+# Add the project root to the Python path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
 
 @pytest.fixture
 def test_client():
@@ -32,8 +42,14 @@ def test_client():
 @pytest.fixture
 def setup_test_media():
     """Create test media files for testing static file serving."""
-    # Ensure media directories exist
-    ensure_media_directories()
+    # Determine the correct media directories based on PROJECT_ROOT
+    test_media_base = os.path.join(PROJECT_ROOT, "public", "media")
+    video_dir = os.path.join(test_media_base, "videos")
+    audio_dir = os.path.join(test_media_base, "audio")
+
+    # Ensure these directories exist
+    os.makedirs(video_dir, exist_ok=True)
+    os.makedirs(audio_dir, exist_ok=True)
     
     # Generate unique test files
     test_id = uuid.uuid4().hex[:8]
@@ -43,32 +59,41 @@ def setup_test_media():
     video_file = f"test_video_{test_id}.mp4"
     audio_file = f"test_audio_{test_id}.mp3"
     
-    video_path = os.path.join("media", "videos", video_file)
-    audio_path = os.path.join("media", "audio", audio_file)
+    # Construct paths within the public/media structure
+    video_path = os.path.join(video_dir, video_file)
+    audio_path = os.path.join(audio_dir, audio_file)
     
     # Write test files
-    with open(video_path, "wb") as f:
-        f.write(video_content)
-    
-    with open(audio_path, "wb") as f:
-        f.write(audio_content)
-    
-    # Return paths for testing
-    yield {
-        "video_file": video_file,
-        "audio_file": audio_file,
-        "video_path": video_path,
-        "audio_path": audio_path,
-        "video_url": f"/media/videos/{video_file}",
-        "audio_url": f"/media/audio/{audio_file}"
-    }
-    
-    # Clean up
     try:
-        os.remove(video_path)
-        os.remove(audio_path)
-    except Exception as e:
-        logger.error(f"Error cleaning up test files: {e}")
+        with open(video_path, "wb") as f:
+            f.write(video_content)
+        logger.info(f"Created test video file: {video_path}")
+        
+        with open(audio_path, "wb") as f:
+            f.write(audio_content)
+        logger.info(f"Created test audio file: {audio_path}")
+        
+        # Return paths and URLs for testing
+        yield {
+            "video_file": video_file,
+            "audio_file": audio_file,
+            "video_path": video_path, # Absolute path
+            "audio_path": audio_path, # Absolute path
+            "video_url": f"/sim-local/public/media/videos/{video_file}",
+            "audio_url": f"/sim-local/public/media/audio/{audio_file}"
+        }
+    
+    finally:
+        # Clean up
+        try:
+            if os.path.exists(video_path):
+                os.remove(video_path)
+                logger.info(f"Cleaned up test video file: {video_path}")
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
+                logger.info(f"Cleaned up test audio file: {audio_path}")
+        except Exception as e:
+            logger.error(f"Error cleaning up test files: {e}")
 
 class TestStaticFileServing:
     """Test cases for static file serving."""

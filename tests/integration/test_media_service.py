@@ -78,7 +78,7 @@ class TestMediaService:
         
         # Verify the result
         assert audio_url is not None
-        assert audio_url.startswith("/media/audio/")
+        assert audio_url.startswith("/sim-local/public/media/audio/")
         
         # Check that the file exists
         audio_path = os.path.join(os.getcwd(), audio_url.lstrip('/'))
