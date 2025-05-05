@@ -210,25 +210,16 @@ const MediaHandler = ({ src, audioSrc, type = 'video/mp4', width = '100%', heigh
         {audioUrl && (
           <audio ref={audioRef} src={audioUrl} preload="auto" />
         )}
-
-        {/* Custom Play/Pause Button - Only show when ready */}
-        {isReady && (
-          <div 
-            className="custom-controls" 
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10
-            }}
-          >
-            <button onClick={handlePlayPause} className={`play-pause-button ${isPlaying ? 'playing' : 'paused'}`}>
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
-          </div>
-        )}
       </div>
+      
+      <style jsx>{`
+        video::-webkit-media-controls {
+          display: none !important;
+        }
+        video::-moz-media-controls {
+          display: none !important;
+        }
+      `}</style>
       
       {/* Debug info (optional) */}
       {/* 

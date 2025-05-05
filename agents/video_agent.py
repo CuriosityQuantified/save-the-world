@@ -55,10 +55,10 @@ class VideoAgent(BaseAgent):
         video_prompt = await self._generate_video_prompt(context["selected_scenario"])
         context["video_prompt"] = video_prompt
         
-        # Submit job to HuggingFace fal-ai - 10-second video duration
+        # Submit job to HuggingFace fal-ai - Aim for ~10s @ 24fps
         job_id = await self.huggingface_service.submit_job(
             prompt=video_prompt,
-            duration=10  # Using 10 seconds as specified
+            num_frames=241  # 241 frames = ~10.04s @ 24fps (Constraint: frames = 8k + 1)
         )
         context["video_job_id"] = job_id
         

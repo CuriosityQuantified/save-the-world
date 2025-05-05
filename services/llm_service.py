@@ -22,6 +22,7 @@ from prompts import (
     FINAL_CONCLUSION_EXAMPLE_JSON
 )
 from prompts.scenario_generation_prompt import get_formatted_prompt_template
+from prompts.video_description_generation_prompt import VIDEO_PROMPT_TEMPLATE
 
 # Add direct groq client import for JSON mode
 from groq import Groq
@@ -71,8 +72,8 @@ class LLMService:
             )
             
             # Optional thinking config for Gemini 2.5 models
-            # self.thinking_config = genai.types.ThinkingConfig(thinking_budget=1024)
-            # self.gemini_config.thinking_config = self.thinking_config
+            self.thinking_config = genai.types.ThinkingConfig(thinking_budget=2000)
+            self.gemini_config.thinking_config = self.thinking_config
         
         # Model-specific configurations
         self.model_configs = {
@@ -202,8 +203,9 @@ class LLMService:
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
         
-        # Models to try in order
-        models_to_try = ["gemini-2.5-flash-preview-04-17", "compound-beta-mini", "qwen-qwq-32b"]
+        # Models to try in order - Prioritize Maverick
+        # models_to_try = ["gemini-2.5-flash-preview-04-17", "compound-beta-mini", "qwen-qwq-32b"]
+        models_to_try = ["meta-llama/llama-4-maverick-17b-128e-instruct", "gemini-2.5-flash-preview-04-17", "compound-beta-mini", "qwen-qwq-32b"]
         
         # Determine if this is the final turn
         is_final_turn = current_turn_number == max_turns
@@ -248,43 +250,67 @@ class LLMService:
                     gemini_config = self.gemini_config
                     gemini_config.temperature = 0.7  # Lower temperature for more reliable results
                     
-                    response = self.genai_client.models.generate_content(
-                        model=model_name,
+                    response = self.genai_client.generate_content(
                         contents=formatted_prompt,
-                        config=gemini_config
+                        generation_config=gemini_config,
+                        # Uncomment if using Vertex AI or specific safety settings
+                        # safety_settings=self.safety_settings  
                     )
                     result = response.text
-                    end_time = time.time()
-                    response_time = end_time - start_time
+                    response_time = time.time() - start_time
                     model_used = model_name
-                    logger.info(f"Successfully generated scenario using {model_name} (Response time: {response_time:.2f}s)")
-                    break
-                elif not model_name.startswith("gemini-"):
-                    # Groq model
+                    logger.info(f"Successfully generated scenario using {model_name}")
+                    break  # Exit loop on success
+                elif model_name.startswith("meta-llama"):
                     logger.info(f"Trying with Groq model: {model_name}")
+                    # Use direct Groq client for JSON mode
                     start_time = time.time()
-                    fallback_llm = self._get_llm_instance(model_name)
-                    chain = LLMChain(llm=fallback_llm, prompt=PromptTemplate(
-                        input_variables=["simulation_history", "current_turn_number", "previous_turn_number", 
-                                        "user_prompt_for_this_turn", "num_ideas", "example_json_output"],
-                        template=template
-                    ))
-                    result = await chain.arun(
-                        simulation_history=simulation_history,
-                        current_turn_number=current_turn_number,
-                        previous_turn_number=previous_turn_number,
-                        user_prompt_for_this_turn=user_prompt_for_this_turn,
-                        num_ideas=num_ideas,
-                        example_json_output=example_json_output
+                    
+                    chat_completion = self.groq_client.chat.completions.create(
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are an AI assistant that generates JSON responses based on the user's request. Ensure the output is a single valid JSON object enclosed in ```json ... ```."
+                            },
+                            {
+                                "role": "user",
+                                "content": formatted_prompt,
+                            }
+                        ],
+                        model=model_name,
+                        temperature=0.7, # Explicitly set temperature to 0.7 for Maverick
+                        max_tokens=8192,
+                        response_format={"type": "json_object"},
                     )
-                    end_time = time.time()
-                    response_time = end_time - start_time
+                    result = chat_completion.choices[0].message.content
+                    response_time = time.time() - start_time
                     model_used = model_name
-                    logger.info(f"Successfully generated scenario using model {model_name} (Response time: {response_time:.2f}s)")
-                    break
+                    logger.info(f"Successfully generated scenario using {model_name}")
+                    break # Exit loop on success
+                else:
+                    # Fallback to other Groq models via LangChain if needed
+                    logger.info(f"Trying with Groq model via LangChain: {model_name}")
+                    llm = self._get_llm_instance(model_name)
+                    chain = LLMChain(llm=llm, prompt=PromptTemplate.from_template("{prompt}"))
+                    
+                    start_time = time.time()
+                    response = await chain.arun(prompt=formatted_prompt)
+                    result = response
+                    response_time = time.time() - start_time
+                    model_used = model_name
+                    logger.info(f"Successfully generated scenario using {model_name}")
+                    break # Exit loop on success
+                    
             except Exception as e:
-                err_message = str(e)
-                logger.warning(f"Model {model_name} failed: {err_message}. Trying next model.")
+                err_message = f"Error with model {model_name}: {e}"
+                logger.error(err_message)
+                # Optionally log the full exception details if needed
+                # logger.exception(f"Full error details for model {model_name}:")
+                # Clear result if error occurred
+                result = "" 
+                response_time = None
+                model_used = ""
+                # Continue to the next model
                 continue
         
         # If all models failed, use a fallback approach
@@ -383,76 +409,28 @@ class LLMService:
         scenario_text += f"User Role: {scenario.get('user_role', '')}\n"
         scenario_text += f"User Prompt: {scenario.get('user_prompt', '')}"
         
-        # Create the prompt template text
-        prompt_template = """
-        ### You are a Text-to-Video Prompt Engineer. When provided with a user's scenario description, generate a concise, descriptive prompt optimized for a 10-second video. Your prompt must:
-
-        ### Content Requirements
-        • Clearly state the subject and its action.  
-        • Specify the environment and setting.  
-        • Describe the visual style, lighting, and camera motion.  
-        • Include temporal cues indicating the duration or sequence (e.g., "over 10 seconds," "begin with…").  
-
-        ### Style Guidelines
-        • Use positive, declarative phrasing only.  
-        • Keep the overall prompt under 30 words.
-
-        Here is the scenario to create a video prompt for:
+        # Use the imported prompt template
+        prompt_template = VIDEO_PROMPT_TEMPLATE
         
-        {scenario}
-        
-        Return ONLY the video generation prompt with no additional explanation or notes.
-        """
-        
-        # Format the prompt for direct use with Gemini
+        # Format the prompt for direct use with the model
         formatted_prompt = prompt_template.format(scenario=scenario_text)
         
         result = ""
-        model_used = ""
+        model_used = "meta-llama/llama-4-maverick-17b-128e-instruct"  # Force use of meta-llama/llama-4-maverick-17b-128e-instruct
         response_time = None
         
         try:
-            # Try with Gemini model first using direct API
-            if self.google_api_key:
-                try:
-                    start_time = time.time()
-                    response = self.genai_client.models.generate_content(
-                        model=self.gemini_model_name,
-                        contents=formatted_prompt,
-                        config=self.gemini_config
-                    )
-                    result = response.text
-                    end_time = time.time()
-                    response_time = end_time - start_time
-                    model_used = self.gemini_model_name
-                    logger.info(f"Successfully generated video prompt using {self.gemini_model_name} direct API (Response time: {response_time:.2f}s)")
-                except Exception as e:
-                    logger.warning(f"Gemini direct API failed for video prompt: {str(e)}. Falling back to default model.")
-                    # Fall back to default model
-                    start_time = time.time()
-                    fallback_llm = self._get_llm_instance(self.default_model_name)
-                    chain = LLMChain(llm=fallback_llm, prompt=PromptTemplate(
-                        input_variables=["scenario"],
-                        template=prompt_template
-                    ))
-                    result = await chain.arun(scenario=scenario_text)
-                    end_time = time.time()
-                    response_time = end_time - start_time
-                    model_used = self.default_model_name
-                    logger.info(f"Generated video prompt using fallback model {self.default_model_name} (Response time: {response_time:.2f}s)")
-            else:
-                # If no Google API key, use default model directly
-                start_time = time.time()
-                fallback_llm = self._get_llm_instance(self.default_model_name)
-                chain = LLMChain(llm=fallback_llm, prompt=PromptTemplate(
-                    input_variables=["scenario"],
-                    template=prompt_template
-                ))
-                result = await chain.arun(scenario=scenario_text)
-                end_time = time.time()
-                response_time = end_time - start_time
-                model_used = self.default_model_name
-                logger.info(f"Used default model {self.default_model_name} for video prompt (Response time: {response_time:.2f}s)")
+            # Directly use the specified Groq model
+            start_time = time.time()
+            groq_llm = self._get_llm_instance(model_used)
+            chain = LLMChain(llm=groq_llm, prompt=PromptTemplate(
+                input_variables=["scenario"],
+                template=prompt_template
+            ))
+            result = await chain.arun(scenario=scenario_text)
+            end_time = time.time()
+            response_time = end_time - start_time
+            logger.info(f"Generated video prompt using {model_used} (Response time: {response_time:.2f}s)")
             
             # Log the interaction
             await self.log_interaction(
@@ -465,8 +443,19 @@ class LLMService:
                 response_time
             )
         except Exception as e:
-            logger.error(f"All LLM attempts failed for video prompt: {str(e)}")
+            logger.error(f"LLM attempt failed for video prompt using {model_used}: {str(e)}")
+            # Provide a safe default prompt in case of error
             result = f"A visual representation of {scenario.get('situation_description', 'an absurd crisis situation')}."
+            # Log the error interaction
+            await self.log_interaction(
+                turn_number,
+                "create_video_prompt_error",
+                formatted_prompt,
+                f"Error: {str(e)}",
+                {},
+                model_used,
+                response_time  # Can still log time if failure happened after start
+            )
         
         return result.strip()
     
