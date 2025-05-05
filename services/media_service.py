@@ -120,51 +120,73 @@ class MediaService:
             # This might return a file path or binary content
             video_result = await self.huggingface_service.generate_video(prompt, turn=turn)
             
-            # If HuggingFaceService returned a URL, use it directly
-            if isinstance(video_result, str) and (video_result.startswith("http") or video_result.startswith("/media")):
-                # For URLs or file paths, make sure the file exists in public directory
-                if video_result.startswith("/media"):
-                    # Convert relative path to absolute
-                    std_path = os.path.join(os.getcwd(), video_result.lstrip('/'))
-                    
-                    # Check if file exists
-                    if os.path.exists(std_path) and os.path.getsize(std_path) > 0:
-                        # Extract filename
-                        filename = os.path.basename(std_path)
-                        
-                        # Copy to public directory
-                        with open(std_path, 'rb') as f:
-                            content = f.read()
-                            # Use our utility to save to both locations
-                            paths = save_media_file(content, "video", filename)
-                        
-                        logger.info(f"Video file copied to public directory: {paths['public_url']}")
-                        return paths['public_url']
-                    else:
-                        logger.error(f"Video file not found or empty: {std_path}")
-                        return None
-                
-                logger.info(f"Video generation complete: {video_result}")
-                return video_result
-            
-            # If we got binary content instead
+            video_content: Optional[bytes] = None
+            filename: str = f"turn_{turn}_{int(time.time())}.mp4"
+
+            # If HuggingFaceService returned a URL, try to fetch it
+            if isinstance(video_result, str) and video_result.startswith("http"):
+                try:
+                    logger.info(f"Fetching video content from URL: {video_result}")
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(video_result) as response:
+                            if response.status == 200:
+                                video_content = await response.read()
+                                logger.info(f"Fetched {len(video_content)} bytes of video data.")
+                            else:
+                                logger.error(f"Failed to fetch video from {video_result}, status: {response.status}")
+                except Exception as fetch_err:
+                    logger.error(f"Error fetching video from URL {video_result}: {fetch_err}")
+
+            # If it returned a local path, read it
+            elif isinstance(video_result, str) and video_result.startswith("/media"):
+                 # Convert relative path to absolute
+                std_path = os.path.join(os.getcwd(), video_result.lstrip('/'))
+                if os.path.exists(std_path) and os.path.getsize(std_path) > 0:
+                    logger.info(f"Reading video content from local path: {std_path}")
+                    with open(std_path, 'rb') as f:
+                        video_content = f.read()
+                    filename = os.path.basename(std_path) # Keep original filename if from path
+                else:
+                    logger.error(f"Video file not found or empty at path: {std_path}")
+
+            # If we got binary content directly
             elif isinstance(video_result, bytes) and len(video_result) > 0:
-                filename = f"turn_{turn}_{int(time.time())}.mp4"
-                public_url = save_media_file(video_result, "video", filename)
-                logger.info(f"Saved video content to file: {public_url}")
-                return public_url
+                video_content = video_result
                 
             # If we got a tuple of (binary, filename)
             elif isinstance(video_result, tuple) and len(video_result) == 2:
-                video_content, filename = video_result
-                if not filename.endswith('.mp4'):
-                    filename = f"{filename}.mp4"
-                public_url = save_media_file(video_content, "video", filename)
-                logger.info(f"Saved video content to file: {public_url}")
-                return public_url
+                video_content, fn_from_tuple = video_result
+                if isinstance(fn_from_tuple, str) and fn_from_tuple.endswith('.mp4'):
+                     filename = fn_from_tuple # Use filename from tuple
+
+            # Now, upload if we have content and R2 is configured
+            if video_content and self.r2_service:
+                try:
+                    logger.info(f"Attempting to upload video '{filename}' to Cloudflare R2...")
+                    r2_url = await asyncio.to_thread(
+                        self.r2_service.upload_video, 
+                        video_content, 
+                        filename=filename
+                    )
+                    logger.info(f"Video successfully uploaded to R2: {r2_url}")
+                    return r2_url
+                except Exception as r2_err:
+                    logger.error(f"Failed to upload video to R2: {r2_err}. Falling back to local save.")
+                    # Fall through to local save below
             
-            logger.error(f"Unexpected video generation result: {type(video_result)}")
-            return None
+            # Fallback: Save locally if R2 is not configured, upload failed, or no content found
+            if video_content:
+                 logger.info("Saving video locally as fallback.")
+                 # Ensure filename is set if not derived earlier
+                 if not filename:
+                      filename = f"turn_{turn}_{int(time.time())}.mp4"
+                 paths = save_media_file(video_content, "video", filename)
+                 public_url = paths.get('public_url') if paths else None
+                 logger.info(f"Saved video content to local file: {public_url}")
+                 return public_url
+            else:
+                 logger.error("No valid video content could be obtained or processed.")
+                 return None
             
         except Exception as e:
             logger.error(f"Error generating video: {str(e)}")
@@ -207,11 +229,30 @@ class MediaService:
             # Unpack the audio data and sampling rate
             audio_data, sampling_rate = audio_result
             
-            # Save the audio to file
+            # Generate filename
             filename = f"turn_{turn}_{int(time.time())}.mp3"
-            public_url = save_media_file(audio_data, "audio", filename)
+
+            # Try uploading to R2 if configured
+            if self.r2_service:
+                try:
+                    logger.info(f"Attempting to upload audio '{filename}' to Cloudflare R2...")
+                    r2_url = await asyncio.to_thread(
+                        self.r2_service.upload_audio, 
+                        audio_data, 
+                        filename=filename
+                    )
+                    logger.info(f"Audio successfully uploaded to R2: {r2_url}")
+                    return r2_url
+                except Exception as r2_err:
+                    logger.error(f"Failed to upload audio to R2: {r2_err}. Falling back to local save.")
+                    # Fall through to local save below
+
+            # Fallback: Save the audio locally
+            logger.info("Saving audio locally as fallback.")
+            paths = save_media_file(audio_data, "audio", filename)
+            public_url = paths.get('public_url') if paths else None
             
-            logger.info(f"Audio generation complete: {public_url}")
+            logger.info(f"Audio generation complete (local save): {public_url}")
             return public_url
                 
         except Exception as e:
