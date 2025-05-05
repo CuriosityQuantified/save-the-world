@@ -4,9 +4,9 @@ This plan outlines the development stages, starting with an MVP to validate the 
 
 **Core Technologies:**
 
-* **LLMs:** For scenario generation, selection, video prompt writing, narration script writing.
-* **Video Generation:** RunwayML API.
-* **Audio Generation:** ElevenLabs API.
+* **LLM Providers:** Groq and Google Gemini API.
+* **Video Generation:** HuggingFace fal-ai provider.
+* **Audio Generation:** HuggingFace Dia-TTS.
 * **State Management:** In-memory (MVP) -> Redis (Later Phases).
 * **Orchestration:** Basic script (MVP) -> Google Agent Development Kit (Later Phases).
 * **Storage:** Local/Temporary (MVP) -> Cloudflare R2 (Later Phases).
@@ -55,7 +55,7 @@ This plan outlines the development stages, starting with an MVP to validate the 
 * 🔄 Multi-model support for different LLM operations
   - Using different models for scenario generation vs. selection
   - Implementing numbered scenario selection (1-5) instead of text matching
-* 🔄 Integration with RunwayML and ElevenLabs APIs
+* 🔄 Integration with HuggingFace services for audio and video generation
 
 **Next Steps:**
 * ⏩ Complete media generation integration
@@ -72,7 +72,7 @@ This plan outlines the development stages, starting with an MVP to validate the 
 1.  **Setup Basic Project:**
     * Create a project directory.
     * Set up a virtual environment and install necessary libraries (e.g., `requests`, `python-dotenv`, LLM client library, basic web server like Flask/FastAPI if needed for simple UI).
-    * Configure environment variables for LLM, Runway, and ElevenLabs API keys.
+    * Configure environment variables for LLM and HuggingFace API keys.
 2.  **Implement Simplified Scenario Generation (LLM 1):**
     * Write a Python function `generate_scenario(context: str) -> str`.
     * This function takes the previous turn's context (or an initial prompt) and calls the LLM to generate *one* new situation description.
@@ -81,12 +81,12 @@ This plan outlines the development stages, starting with an MVP to validate the 
     * Write `generate_video_prompt(situation: str) -> str` (using LLM 3).
     * Write `generate_narration_script(situation: str) -> str` (using LLM 4).
     * These functions take the generated situation and create the respective prompts/scripts. Aim for ~10 seconds of content.
-4.  **Integrate RunwayML API:**
-    * Write a function `submit_runway_job(prompt: str) -> str` that sends the prompt to the Runway API and initiates video generation. It should return a job ID.
-    * Write a function `get_runway_result(job_id: str) -> str | None` that polls the Runway API using the job ID and returns the video URL once completed (or `None` if still processing). Handle basic API errors.
-5.  **Integrate ElevenLabs API:**
-    * Write a function `submit_elevenlabs_job(script: str) -> str` that sends the script to the ElevenLabs API. This might return audio data directly or a job ID depending on the chosen endpoint/workflow.
-    * If asynchronous, write a corresponding `get_elevenlabs_result` function similar to Runway's. Ensure the output is a usable audio URL or file path.
+4.  **Integrate HuggingFace Video Generation API:**
+    * Write a function `submit_video_job(prompt: str) -> str` that sends the prompt to the HuggingFace fal-ai API and initiates video generation. It should return a job ID.
+    * Write a function `get_video_result(job_id: str) -> str | None` that polls the HuggingFace API using the job ID and returns the video URL once completed (or `None` if still processing). Handle basic API errors.
+5.  **Integrate HuggingFace Dia-TTS API:**
+    * Write a function `submit_tts_job(script: str) -> str` that sends the script to the HuggingFace Dia-TTS API. This might return audio data directly or a job ID depending on the chosen endpoint/workflow.
+    * If asynchronous, write a corresponding `get_tts_result` function similar to video generation. Ensure the output is a usable audio URL or file path.
 6.  **Basic State Management:**
     * Use simple Python variables or a dictionary in the main script to hold the current `situation`, `user_response`, `video_url`, `audio_url`, and `turn_number`. This state will be lost when the script ends.
 7.  **Create Simple User Interface (CLI or Basic HTML):**
@@ -107,8 +107,8 @@ This plan outlines the development stages, starting with an MVP to validate the 
             * `situation = generate_scenario(context)`
             * `video_prompt = generate_video_prompt(situation)`
             * `narration_script = generate_narration_script(situation)`
-            * `runway_job_id = submit_runway_job(video_prompt)`
-            * `elevenlabs_job_id = submit_elevenlabs_job(narration_script)`
+            * `video_job_id = submit_video_job(video_prompt)`
+            * `tts_job_id = submit_tts_job(narration_script)`
             * **Poll** for results (wait until both `video_url` and `audio_url` are available). *This will be blocking.*
             * Display situation, video, audio to the user (via CLI or web UI).
             * Get `user_response`.
@@ -127,9 +127,9 @@ This plan outlines the development stages, starting with an MVP to validate the 
 2.  **Refactor LLM Calls into Tools:** Convert the Python functions from Phase 1 (`generate_scenario`, `generate_video_prompt`, `generate_narration_script`) into GADK Tools within the appropriate agents.
 3.  **Implement Full Scenario Generation/Selection:** Implement the `create_idea` (generate 5) and `critique_idea` (select 1) tools within the `CreativeDirectorAgent`.
 4.  **Implement Redis State Management:** Define the `ScenarioState` Pydantic model. Implement `load/save_scenario_state` helpers. Update tools to read from and write to Redis instead of using in-memory variables. Store `turn_history`.
-5.  **Refactor API Calls:** Move Runway/ElevenLabs submission logic into `submit_video_job` and `submit_tts_job` tools within their respective agents. These tools should update the `ScenarioState` in Redis with job IDs and status.
+5.  **Refactor API Calls:** Move HuggingFace submission logic into `submit_video_job` and `submit_tts_job` tools within their respective agents. These tools should update the `ScenarioState` in Redis with job IDs and status.
 6.  **Handle Asynchronous Callbacks/Polling:**
-    * **Option A (Webhooks):** Configure Runway/ElevenLabs to send completion events to webhook endpoints hosted by your GADK application (e.g., on Vercel). These endpoints trigger functions to update the `ScenarioState` in Redis with the final media URLs.
+    * **Option A (Webhooks):** Configure HuggingFace services to send completion events to webhook endpoints hosted by your GADK application (e.g., on Vercel). These endpoints trigger functions to update the `ScenarioState` in Redis with the final media URLs.
     * **Option B (Background Polling):** Implement a separate process or scheduled task that periodically checks the status of pending jobs (using job IDs stored in Redis) and updates the `ScenarioState` upon completion.
 7.  **Orchestration:** Define the GADK event flow: `CreativeDirectorAgent` finishes -> triggers `VideoAgent` and `NarrationAgent` in parallel -> UI waits for status updates in Redis indicating media readiness.
 

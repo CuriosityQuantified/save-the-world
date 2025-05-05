@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Simulation</title>
+    <title>Save the World?</title>
     <style>
         :root {
             /* Dark mode variables */
@@ -405,7 +405,7 @@
 <body>
     <div class="container">
         <div class="header-container">
-            <h1>Interactive Simulation</h1>
+            <h1>Save the World?</h1>
             <div class="controls">
                 <span class="toggle-label">Developer Mode</span>
                 <label class="switch">
@@ -789,6 +789,20 @@
                     scenarioAudioElement.style.display = 'block';
                     scenarioAudioElement.querySelector('source').src = currentTurn.audio_url;
                     scenarioAudioElement.load();
+                    
+                    // Synchronize video and audio playback
+                    scenarioVideoElement.onplay = () => {
+                        scenarioAudioElement.currentTime = scenarioVideoElement.currentTime;
+                        scenarioAudioElement.play();
+                    };
+                    
+                    scenarioVideoElement.onpause = () => {
+                        scenarioAudioElement.pause();
+                    };
+                    
+                    scenarioVideoElement.onseeked = () => {
+                        scenarioAudioElement.currentTime = scenarioVideoElement.currentTime;
+                    };
                 } else {
                     scenarioAudioElement.style.display = 'none';
                 }

@@ -52,11 +52,20 @@ async def test_huggingface_integration():
     try:
         # Generate video
         logger.info("Generating video...")
-        video_url = await huggingface_service.generate_video(prompt)
-        
+        turn_number = 1
+        simulation_id = "testsim"
+        video_path = await huggingface_service.generate_video(prompt, turn_number=turn_number, simulation_id=simulation_id)
+
         logger.info(f"Video generation complete!")
-        logger.info(f"Video URL/result: {video_url}")
-        return True
+        logger.info(f"Video file path: {video_path}")
+
+        # Check that the file exists
+        if os.path.exists(video_path) and os.path.isfile(video_path):
+            logger.info(f"SUCCESS: Video file exists at {video_path}")
+            return True
+        else:
+            logger.error(f"FAIL: Video file does not exist at {video_path}")
+            return False
     except Exception as e:
         logger.error(f"Error testing HuggingFace integration: {e}")
         return False

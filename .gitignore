@@ -80,4 +80,23 @@ pids
 out/
 
 # Large files and directories
-test_output.log 
+test_output.log
+
+# Added by Claude Task Master
+logs
+dev-debug.log
+# Dependency directories
+node_modules/
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+# Task files
+tasks.json
+tasks/ 

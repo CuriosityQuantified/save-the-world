@@ -11,6 +11,7 @@ import sys
 import socket
 import time
 from dotenv import load_dotenv
+from utils.media import ensure_media_directories
 
 def find_available_port(start_port=8000, max_port=8100):
     """Find an available port to use if the default is occupied."""
@@ -29,6 +30,9 @@ def find_available_port(start_port=8000, max_port=8100):
 if __name__ == "__main__":
     # Load environment variables
     load_dotenv()
+    
+    # Ensure media directories exist
+    ensure_media_directories()
     
     # Get host and port from environment or use defaults
     host = os.getenv("HOST", "0.0.0.0")

@@ -221,4 +221,83 @@ async def websocket_endpoint(
         if simulation_id in active_connections:
             active_connections[simulation_id].remove(websocket)
             if not active_connections[simulation_id]:
-                del active_connections[simulation_id] 
+                del active_connections[simulation_id]
+
+@router.get("/debug/media-check")
+async def debug_media_check():
+    """
+    Debug endpoint to check media directories and files.
+    Verifies that media directories exist and lists files in them.
+    """
+    import os
+    from utils.media import ensure_media_directories
+    
+    # Ensure media directories exist
+    try:
+        ensure_media_directories()
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to create media directories: {str(e)}"}
+        )
+    
+    # Check video directory
+    video_dir = os.path.join(os.getcwd(), "media", "videos")
+    videos = []
+    if os.path.exists(video_dir):
+        for filename in os.listdir(video_dir):
+            file_path = os.path.join(video_dir, filename)
+            if os.path.isfile(file_path):
+                videos.append({
+                    "filename": filename,
+                    "path": file_path,
+                    "size": os.path.getsize(file_path),
+                    "url": f"/media/videos/{filename}"
+                })
+    
+    # Check audio directory
+    audio_dir = os.path.join(os.getcwd(), "media", "audio")
+    audios = []
+    if os.path.exists(audio_dir):
+        for filename in os.listdir(audio_dir):
+            file_path = os.path.join(audio_dir, filename)
+            if os.path.isfile(file_path):
+                audios.append({
+                    "filename": filename,
+                    "path": file_path,
+                    "size": os.path.getsize(file_path),
+                    "url": f"/media/audio/{filename}"
+                })
+    
+    # Check configured media mounts
+    from fastapi import FastAPI
+    app = router.app
+    mounts = []
+    for route in app.routes:
+        if hasattr(route, "path") and hasattr(route, "name"):
+            if route.name in ["media", "static", "ui"]:
+                mounts.append({
+                    "name": route.name,
+                    "path": route.path
+                })
+    
+    return {
+        "media_directories": {
+            "videos": {
+                "exists": os.path.exists(video_dir),
+                "path": video_dir,
+                "file_count": len(videos)
+            },
+            "audio": {
+                "exists": os.path.exists(audio_dir),
+                "path": audio_dir,
+                "file_count": len(audios)
+            }
+        },
+        "media_files": {
+            "videos": videos,
+            "audio": audios
+        },
+        "media_mounts": mounts,
+        "working_directory": os.getcwd()
+    } 

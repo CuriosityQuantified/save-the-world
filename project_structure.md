@@ -15,11 +15,12 @@ This document provides an overview of the project's structure, key components, a
 
 ### Services
 
-| Service | File Location | Description |
-|---------|---------------|-------------|
-| LLM Service | `services/llm_service.py` | Central service for all LLM interactions, including scenario generation, selection, video prompts, and narration scripts |
-| Media Services | To be implemented | Will handle RunwayML and ElevenLabs API integrations |
-| API Service | To be implemented | Will provide REST endpoints for the frontend |
+| Service | Status | Description |
+|---------|--------|-------------|
+| LLM Service | Implemented | Manages LLM API calls using Groq or Google Gemini |
+| Media Services | Implemented | Handles HuggingFace API integrations for video and audio |
+| State Service | Implemented | Manages state across simulation turns |
+| Simulation Service | Implemented | Orchestrates the simulation flow |
 
 ### Testing
 
@@ -57,15 +58,110 @@ The project is following a phased implementation approach as outlined in `build-
 
 ```
 sim-local/
-├── services/
-│   └── llm_service.py           # LLM interaction service
-├── tests/
-│   └── test_scenario_generation.py  # Test for scenario generation
-├── scenario_generation_prompt.py    # Prompt templates for scenario generation
-├── build-plan.md                # Phased build plan with progress
-├── flow.md                      # Core simulation flow documentation
-└── project_structure.md         # This file
+│
+├── agents/                     # GADK integration
+│   ├── creative_director_agent.py   # Scenario generation/selection agent
+│   ├── video_agent.py          # Video generation agent
+│   └── narration_agent.py      # Audio generation agent
+│
+├── api/                        # FastAPI implementation
+│   ├── app.py                  # Main FastAPI application
+│   ├── router.py               # API routes and handlers
+│   └── config.py               # API configuration
+│
+├── services/                   # Core services
+│   ├── llm_service.py          # LLM API client
+│   ├── media_service.py         # Media generation (HuggingFace video/audio)
+│   ├── huggingface_service.py  # HuggingFace video generation
+│   ├── huggingface_tts_service.py # HuggingFace TTS audio generation
+│   ├── state_service.py        # State management
+│   ├── simulation_service.py   # Simulation orchestration
+│   └── cloudflare_r2_service.py # Media storage
+│
+├── models/                     # Data models
+│   ├── scenario.py             # Scenario model
+│   ├── user_input.py           # User input model
+│   └── simulation_state.py     # Simulation state model
+│
+├── prompts/                    # LLM prompt templates
+│   ├── scenario_generation.py  # Templates for scenario generation
+│   ├── scenario_selection.py   # Templates for selecting best scenario
+│   ├── video_prompt.py         # Templates for video prompts
+│   └── narration_script.py     # Templates for narration scripts
+│
+├── schemas/                    # API schemas
+│   ├── scenario.py             # API scenario schema
+│   ├── user_input.py           # API user input schema
+│   └── simulation.py           # API simulation schema
+│
+├── utils/                      # Utility functions
+│   ├── media.py                # Media file helpers
+│   ├── logging.py              # Logging configuration
+│   └── json.py                 # JSON helpers
+│
+├── scripts/                    # Utility scripts
+│   ├── test_llm.py             # Test LLM API integration
+│   └── prd.txt                 # Product Requirements Document
+│
+├── tests/                      # Tests
+│   ├── unit/                   # Unit tests
+│   │   ├── test_llm_service.py # Test LLM service
+│   │   └── test_state_service.py # Test state service
+│   ├── integration/            # Integration tests
+│   │   ├── test_simulation.py  # Test end-to-end simulation
+│   │   └── test_media_service.py # Test media generation
+│   └── conftest.py             # Test configuration
+│
+├── ui/                         # Web UI
+│   ├── index.html              # Main HTML page
+│   ├── styles.css              # CSS styles
+│   └── script.js               # Frontend JavaScript
+│
+├── media/                      # Media storage
+│   ├── videos/                 # Generated videos
+│   └── audio/                  # Generated audio files
+│
+├── .env                        # Environment variables
+├── .env.example                # Example environment variables
+├── README.md                   # Project documentation
+└── requirements.txt            # Python dependencies
 ```
+
+## Data Flow
+
+1. User initiates simulation request
+2. `SimulationService` orchestrates 5-turn flow
+3. At each turn:
+   - `LLMService` generates scenario options
+   - `LLMService` selects best scenario
+   - `MediaService` generates video via HuggingFace
+   - `MediaService` generates audio via HuggingFace
+   - Results presented to user
+   - User response captured and added to context
+4. Process repeats for 5 turns
+
+## Key Components
+
+### LLM Service
+- Handles interactions with Groq and Google Gemini
+- Manages prompt templates and context building
+- Provides methods for different LLM tasks
+
+### Media Service
+- Coordinates video generation using HuggingFace fal-ai
+- Coordinates audio generation using HuggingFace Dia-TTS
+- Handles media storage and retrieval
+
+### Simulation Service
+- Manages overall simulation logic
+- Coordinates between LLM and Media services
+- Builds and maintains simulation state
+- Enforces 5-turn structure
+
+### State Service
+- Manages simulation state persistence
+- Handles session management
+- Provides retrieval methods for active simulations
 
 ## Future Structure (Planned)
 
@@ -78,7 +174,7 @@ sim-local/
 │   └── models/                  # Data models
 ├── services/                    # Service layer
 │   ├── llm_service.py           # LLM service
-│   ├── media_service.py         # Media generation (RunwayML/ElevenLabs)
+│   ├── media_service.py         # Media generation (HuggingFace video/audio)
 │   └── state_service.py         # State management
 ├── frontend/                    # Web UI components
 ├── prompts/                     # All prompt templates

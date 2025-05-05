@@ -142,12 +142,11 @@ class SimulationService:
                 # Add media prompts to the simulation state - set narration_script to None
                 simulation.add_media_prompts(1, video_prompt, None)
                 
-                # Generate media (async - will be available later)
-                video_url = await self.media_service.generate_video(video_prompt)
-                audio_url = await self.media_service.generate_audio(scenario)
+                # Generate media (video and audio in parallel)
+                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=1)
                 
                 # Add media URLs to the simulation state
-                simulation.add_media_urls(1, video_url, audio_url)
+                simulation.add_media_urls(1, media_results['video_url'], media_results['audio_url'])
             except Exception as e:
                 logger.error(f"Error processing scenario: {str(e)}")
                 raise
@@ -250,19 +249,11 @@ class SimulationService:
                 # Add media prompts to the simulation state - set narration_script to None
                 simulation.add_media_prompts(next_turn, video_prompt, None)
                 
-                try:
-                    # Generate media - handle failures gracefully
-                    video_url = await self.media_service.generate_video(video_prompt)
-                    audio_url = await self.media_service.generate_audio(scenario)
-                    
-                    # Add media URLs to the simulation state
-                    simulation.add_media_urls(next_turn, video_url, audio_url)
-                except Exception as media_error:
-                    logger.error(f"Error generating media for turn {next_turn}: {str(media_error)}")
-                    # Add placeholder URLs to prevent UI issues
-                    simulation.add_media_urls(next_turn, 
-                                             "https://example.com/fallback_video.mp4", 
-                                             "https://example.com/fallback_audio.mp3")
+                # Generate media (video and audio in parallel)
+                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=next_turn)
+                
+                # Add media URLs to the simulation state
+                simulation.add_media_urls(next_turn, media_results['video_url'], media_results['audio_url'])
                 
                 # Check if the simulation is now complete (final turn)
                 simulation.is_complete = (next_turn == simulation.max_turns)

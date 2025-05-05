@@ -1,7 +1,7 @@
 """
-HuggingFace Narration Agent Module
+Narration Agent Module
 
-This module implements the HuggingFaceNarrationAgent which is responsible for
+This module implements the NarrationAgent which is responsible for
 interfacing with the HuggingFace Dia-TTS API to create audio content for scenarios.
 """
 
@@ -9,7 +9,7 @@ from typing import Dict, Any
 from agents.base_agent import BaseAgent
 from services.huggingface_tts_service import HuggingFaceTTSService
 
-class HuggingFaceNarrationAgent(BaseAgent):
+class NarrationAgent(BaseAgent):
     """
     Agent responsible for generating audio narration for scenarios.
     Handles the HuggingFace Dia-TTS API integration.
@@ -20,7 +20,7 @@ class HuggingFaceNarrationAgent(BaseAgent):
     
     def __init__(self, huggingface_tts_service: HuggingFaceTTSService):
         """
-        Initialize the HuggingFace Narration Agent.
+        Initialize the Narration Agent.
         
         Args:
             huggingface_tts_service: The HuggingFace TTS service for audio generation

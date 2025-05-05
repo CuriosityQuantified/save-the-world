@@ -3,7 +3,7 @@
 End-to-End Test for Cloudflare R2 Video Integration Pipeline
 
 This script tests the complete video generation and storage pipeline:
-1. Generate a video using HuggingFace or RunwayML APIs 
+1. Generate a video using HuggingFace API 
 2. Store the video in Cloudflare R2
 3. Retrieve the video in both public and private access modes
 4. Test error handling for failed uploads/downloads
@@ -21,7 +21,7 @@ Environment variables required:
     - CLOUDFLARE_R2_ACCESS_KEY_ID
     - CLOUDFLARE_R2_SECRET_ACCESS_KEY
     - CLOUDFLARE_R2_BUCKET_NAME
-    - HUGGINGFACE_API_KEY or RUNWAY_API_KEY (only if not using --skip-api)
+    - HUGGINGFACE_API_KEY (only if not using --skip-api)
 """
 
 import os
@@ -79,9 +79,8 @@ class R2VideoPipelineTest:
         self.r2_secret_access_key = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
         self.r2_bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET_NAME")
         
-        # Get API keys for video generation
+        # Get API key for video generation
         self.huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY", "")
-        self.runway_api_key = os.getenv("RUNWAY_API_KEY", "")
         
         # Log configuration
         logger.info(f"Test Configuration:")
@@ -110,9 +109,9 @@ class R2VideoPipelineTest:
             return False
         
         # Validate API keys if not skipping API calls
-        if not self.skip_api and not (self.huggingface_api_key or self.runway_api_key):
-            logger.error("Either HUGGINGFACE_API_KEY or RUNWAY_API_KEY is required if not using --skip-api")
-            logger.error("Set one of these in your .env file or use --skip-api")
+        if not self.skip_api and not self.huggingface_api_key:
+            logger.error("HUGGINGFACE_API_KEY is required if not using --skip-api")
+            logger.error("Set it in your .env file or use --skip-api")
             return False
         
         # Initialize CloudflareR2Service
@@ -130,7 +129,6 @@ class R2VideoPipelineTest:
         logger.info("Initializing MediaService")
         self.media_service = MediaService(
             huggingface_api_key=self.huggingface_api_key if not self.skip_api else "dummy_key",
-            runway_api_key=self.runway_api_key if not self.skip_api else "dummy_key",
             cloudflare_r2_endpoint=self.r2_endpoint,
             cloudflare_r2_access_key_id=self.r2_access_key_id,
             cloudflare_r2_secret_access_key=self.r2_secret_access_key,

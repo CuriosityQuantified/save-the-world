@@ -1,0 +1,39 @@
+<context>
+# Overview  
+This project is an Interactive Simulation system that generates personalized scenario-based simulations using AI. The system creates scenarios using LLMs, produces videos through HuggingFace fal-ai API, and generates narration audio via HuggingFace Dia-TTS API. The user interacts with the simulation, and the system must now persistently save the generated video and audio files for each turn.
+
+# Core Features  
+- Scenario generation using LLMs
+- Video generation using HuggingFace fal-ai API
+- Audio narration using HuggingFace Dia-TTS API
+- User interaction and branching narrative
+- **Persistent saving of generated video and audio files for each simulation turn**
+
+# User Experience  
+- Users are presented with a scenario, video, and narration
+- Users respond with choices, influencing the next scenario
+- Users can revisit previous turns and replay video/audio
+</context>
+<PRD>
+# Technical Architecture  
+- Python backend orchestrates LLM and HuggingFace API calls
+- Video and audio files are saved to a dedicated local directory (e.g., media/videos/, media/audio/)
+- Each file is named uniquely per simulation turn (e.g., turn_1.mp4, turn_1.wav)
+- File paths are logged and associated with simulation state for retrieval
+
+# Development Roadmap  
+- MVP: Implement persistent saving of video and audio files after generation
+- Future: Cloud storage integration, user media library, advanced retrieval
+
+# Logical Dependency Chain
+- Core simulation loop must generate and save media files before presenting to user
+- Media saving must occur immediately after API response
+- File paths must be tracked in simulation state
+
+# Risks and Mitigations  
+- Risk: File naming collisions → Mitigation: Use unique identifiers per turn
+- Risk: Disk space usage → Mitigation: Add cleanup or storage monitoring in future
+
+# Appendix  
+- See build-plan.md and flow.md for detailed simulation flow and requirements
+</PRD> 

@@ -2,8 +2,8 @@
 
 A system that generates personalized scenario-based simulations using AI, featuring:
 - Scenario generation using LLMs (Groq or Google Gemini)
-- Video generation via HuggingFace fal-ai provider or RunwayML Gen-4 Turbo
-- Audio narration through ElevenLabs
+- Video generation via HuggingFace fal-ai provider
+- Audio narration through HuggingFace Dia-TTS
 - Interactive 5-turn simulation flow
 
 ## Features
@@ -11,7 +11,7 @@ A system that generates personalized scenario-based simulations using AI, featur
 - **FastAPI Backend**: RESTful API with WebSocket support for real-time updates
 - **Interactive Web UI**: Simple frontend for interacting with simulations
 - **5-Turn Simulation**: Complete simulation flow with state management
-- **Media Generation**: Integration with HuggingFace fal-ai, RunwayML Gen-4 Turbo and ElevenLabs APIs
+- **Media Generation**: Integration with HuggingFace fal-ai for video and Dia-TTS for audio
 - **Multiple LLM Support**: Works with Groq models and Google Gemini 2.5 Flash
 - **Diverse Scenarios**: Absurd world-threatening crises including humans, animals, and abstract concepts
 - **Conclusive Endings**: Special scenario generation for satisfying final turns
@@ -73,9 +73,7 @@ sim-local/
 
 5. Update the `.env` file with your API keys:
    - `GROQ_API_KEY`: Your Groq API key for LLM access
-   - `RUNWAY_API_KEY`: Your RunwayML API key for video generation
    - `HUGGINGFACE_API_KEY`: Your HuggingFace API key for video generation and text-to-speech narration
-   - `ELEVENLABS_API_KEY`: Your ElevenLabs API key (legacy, optional)
    - `GOOGLE_API_KEY`: Your Google API key for Gemini models (optional)
 
 ## Running the Application
@@ -87,22 +85,6 @@ python main.py
 ```
 
 The server will start at http://localhost:8000, and you can access the web UI by opening that URL in your browser.
-
-## Testing RunwayML Integration
-
-To test the RunwayML Gen-4 Turbo integration:
-
-1. Ensure your `RUNWAY_API_KEY` is set in your `.env` file
-2. Run the test script:
-   ```bash
-   python scripts/test_runway.py
-   ```
-3. Or provide a custom prompt:
-   ```bash
-   python scripts/test_runway.py "Generate a 10-second video of: A serene beach at sunset with waves gently washing ashore."
-   ```
-
-The script will generate a 10-second video using RunwayML Gen-4 Turbo and provide a URL to view the result.
 
 ## Testing HuggingFace Integration
 

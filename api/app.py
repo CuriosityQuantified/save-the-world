@@ -46,14 +46,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Determine project root directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Initialize services
 def init_services():
     """Initialize services and attach them to the router."""
     try:
         # Get API keys from environment
         groq_api_key = os.getenv("GROQ_API_KEY")
-        runway_api_key = os.getenv("RUNWAY_API_KEY")
-        elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
         gemini_api_key = os.getenv("GOOGLE_API_KEY")  # Look for Google API key for Gemini
         huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")  # Get HuggingFace API key
         
@@ -71,24 +72,16 @@ def init_services():
             cloudflare_r2_url_expiry = 3600  # Default to 1 hour if invalid value
         
         if not groq_api_key:
-            logger.warning("GROQ_API_KEY not found in environment. LLM service will not work correctly.")
+            logger.warning("GROQ_API_KEY not found in environment. LLM and TTS services will not work correctly.")
             groq_api_key = "dummy_key"
+        else:
+            logger.info("Groq API key found. Using Groq for LLM and TTS generation.")
             
         if not huggingface_api_key:
             logger.warning("HUGGINGFACE_API_KEY not found in environment. HuggingFace video generation will be mocked.")
             huggingface_api_key = "dummy_key"
-            # Check if we have RunwayML as fallback
-            if not runway_api_key:
-                logger.warning("RUNWAY_API_KEY not found in environment. No video generation will be available.")
-                runway_api_key = "dummy_key"
-            else:
-                logger.info("Using RunwayML as fallback for video generation.")
         else:
             logger.info("HuggingFace API key found. Using HuggingFace for video generation.")
-            
-        if not elevenlabs_api_key:
-            logger.warning("ELEVENLABS_API_KEY not found in environment. Audio generation will be mocked.")
-            elevenlabs_api_key = "dummy_key"
             
         if not gemini_api_key:
             logger.warning("GOOGLE_API_KEY not found in environment. Gemini model will not be available, using Groq as primary.")
@@ -115,9 +108,8 @@ def init_services():
         )
         state_service = StateService()
         media_service = MediaService(
-            huggingface_api_key=huggingface_api_key, 
-            elevenlabs_api_key=elevenlabs_api_key,
-            runway_api_key=runway_api_key,  # Keep RunwayML as fallback
+            huggingface_api_key=huggingface_api_key,
+            groq_api_key=groq_api_key,
             cloudflare_r2_endpoint=cloudflare_r2_endpoint,
             cloudflare_r2_access_key_id=cloudflare_r2_access_key_id,
             cloudflare_r2_secret_access_key=cloudflare_r2_secret_access_key,
@@ -151,4 +143,12 @@ async def startup_event():
 app.include_router(router, prefix="/api")
 
 # Mount static files for the frontend
-app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui") 
+app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")
+
+# Mount static files for media (videos, audio, etc.) directly to subdirs
+# Use absolute paths to avoid ambiguity
+media_audio_dir = os.path.join(PROJECT_ROOT, "public", "media", "audio")
+media_videos_dir = os.path.join(PROJECT_ROOT, "public", "media", "videos")
+
+app.mount("/media/audio", StaticFiles(directory=media_audio_dir, check_dir=False), name="media_audio")
+app.mount("/media/videos", StaticFiles(directory=media_videos_dir, check_dir=False), name="media_videos")
