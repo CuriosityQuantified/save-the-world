@@ -20,7 +20,7 @@ app.prepare().then(() => {
   server.use(express.static('public'));
 
   // Handle media file requests
-  server.get('/media/:type/:filename', async (req, res) => {
+  server.get('/media/:type/:filename(*)', async (req, res) => {
     try {
       const { type, filename } = req.params;
       const objectKey = `${type}/${filename}`;
@@ -43,7 +43,7 @@ app.prepare().then(() => {
   });
 
   // Let Next.js handle all other routes
-  server.get('*', (req, res) => {
+  server.all('*', (req, res) => {
     return handle(req, res);
   });
 
