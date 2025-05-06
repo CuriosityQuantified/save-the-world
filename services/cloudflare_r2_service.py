@@ -72,9 +72,7 @@ class CloudflareR2Service:
             config=Config(
                 signature_version='s3v4',
                 s3={'addressing_style': 'virtual'},
-                retries={'max_attempts': max_retries, 'mode': 'standard'},
-                request_checksum_calculation='WHEN_REQUIRED',
-                response_checksum_validation='WHEN_REQUIRED'
+                retries={'max_attempts': max_retries, 'mode': 'standard'}
             )
         )
         
