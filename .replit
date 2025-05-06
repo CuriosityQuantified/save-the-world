@@ -11,18 +11,3 @@ run = ["sh", "-c", "python main.py"]
 [[ports]]
 localPort = 8000
 externalPort = 80
-
-[workflows]
-runButton = "Run Server"
-
-[[workflows.workflow]]
-name = "Run Server"
-author = 22411629
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node server.js"
-
-[objectStorage]
-defaultBucketID = "replit-objstore-5db35131-bcf6-416f-b775-4204671f3e73"

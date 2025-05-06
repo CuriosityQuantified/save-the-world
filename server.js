@@ -1,58 +1,32 @@
-
 const express = require('express');
 const next = require('next');
 const path = require('path');
-const { Client } = require('@replit/object-storage');
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-const PORT = process.env.PORT || 5000;
-
-// Initialize Replit Object Storage client
-const client = new Client();
-
 app.prepare().then(() => {
   const server = express();
 
-  // Serve static files from public directory
-  server.use(express.static('public'));
+  // Set up static middleware for media files
+  server.use('/sim-local/public/media', express.static(path.join(__dirname, '/sim-local/public/media')));
+  
+  // For videos specifically - ensuring they're properly served
+  server.use('/sim-local/public/media/videos', express.static(path.join(__dirname, '/sim-local/public/media/videos')));
+  
+  // For audio files
+  server.use('/sim-local/public/media/audio', express.static(path.join(__dirname, '/sim-local/public/media/audio')));
 
-  // Handle media file requests
-  server.get('/media/:type/*', async (req, res) => {
-    try {
-      const { type } = req.params;
-      const filename = req.params[0]; // Get the rest of the path
-      const objectKey = `${type}/${filename}`;
-      
-      const data = await client.download_as_bytes(objectKey);
-      
-      // Set appropriate content type
-      const contentType = type === 'audio' ? 'audio/mpeg' : 'video/mp4';
-      res.setHeader('Content-Type', contentType);
-      res.send(data);
-    } catch (error) {
-      console.error('Error serving media:', error);
-      res.status(404).send('Media not found');
-    }
-  });
-
-  // API routes
-  server.use('/api', (req, res) => {
-    return handle(req, res);
-  });
-
-  // Let Next.js handle all other routes
+  // Handle all other routes with Next.js
   server.all('*', (req, res) => {
     return handle(req, res);
   });
 
-  server.listen(PORT, '0.0.0.0', (err) => {
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, (err) => {
     if (err) throw err;
-    console.log(`> Ready on http://0.0.0.0:${PORT}`);
+    console.log(`> Ready on http://localhost:${PORT}`);
+    console.log(`> Media files served from ${path.join(__dirname, 'media')}`);
   });
-}).catch((err) => {
-  console.error('Error starting server:', err);
-  process.exit(1);
-});
+}); 
