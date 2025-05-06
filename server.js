@@ -1,3 +1,4 @@
+
 const express = require('express');
 const next = require('next');
 const path = require('path');
@@ -9,24 +10,18 @@ const handle = app.getRequestHandler();
 app.prepare().then(() => {
   const server = express();
 
-  // Set up static middleware for media files
-  server.use('/sim-local/public/media', express.static(path.join(__dirname, '/sim-local/public/media')));
+  // Serve media files from the public directory
+  server.use('/media', express.static(path.join(process.cwd(), 'public', 'media')));
   
-  // For videos specifically - ensuring they're properly served
-  server.use('/sim-local/public/media/videos', express.static(path.join(__dirname, '/sim-local/public/media/videos')));
-  
-  // For audio files
-  server.use('/sim-local/public/media/audio', express.static(path.join(__dirname, '/sim-local/public/media/audio')));
-
   // Handle all other routes with Next.js
   server.all('*', (req, res) => {
     return handle(req, res);
   });
 
   const PORT = process.env.PORT || 3000;
-  server.listen(PORT, (err) => {
+  server.listen(PORT, '0.0.0.0', (err) => {
     if (err) throw err;
-    console.log(`> Ready on http://localhost:${PORT}`);
-    console.log(`> Media files served from ${path.join(__dirname, 'media')}`);
+    console.log(`> Ready on http://0.0.0.0:${PORT}`);
+    console.log(`> Media files served from ${path.join(process.cwd(), 'public', 'media')}`);
   });
-}); 
+});
