@@ -1,202 +1,186 @@
+
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import MediaHandler from '../components/MediaHandler';
 
-export default function SimulationPage({ initialScenario }) {
-  const [scenario, setScenario] = useState(initialScenario || {
-    situation_description: "Loading situation...",
-    video_url: null,
-    audio_url: null
+export default function SimulationPage() {
+  const [simulation, setSimulation] = useState({
+    currentScenario: null,
+    isLoading: false,
+    error: null
   });
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Function to load a scenario
-  const loadScenario = async () => {
-    setIsLoading(true);
-    setError(null);
-    
+  const generateScenario = async () => {
+    setSimulation(prev => ({ ...prev, isLoading: true, error: null }));
     try {
       const response = await fetch('/api/scenario');
       if (!response.ok) {
-        throw new Error(`Failed to fetch scenario: ${response.status}`);
+        throw new Error('Failed to fetch scenario');
       }
-      
       const data = await response.json();
-      setScenario(data);
+      setSimulation(prev => ({
+        ...prev,
+        currentScenario: data,
+        isLoading: false
+      }));
     } catch (err) {
-      console.error('Error loading scenario:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+      setSimulation(prev => ({
+        ...prev,
+        error: err.message,
+        isLoading: false
+      }));
     }
   };
-  
-  // Load scenario on initial page load
-  useEffect(() => {
-    if (!initialScenario) {
-      loadScenario();
-    }
-  }, [initialScenario]);
 
   return (
-    <div className="simulation-container">
+    <div className="container">
       <Head>
         <title>Simulation Experience</title>
         <meta name="description" content="Interactive simulation experience" />
       </Head>
-      
-      <main>
-        <h1>Interactive Simulation</h1>
-        
-        {isLoading ? (
-          <div className="loading">
-            <p>Loading simulation content...</p>
-          </div>
-        ) : error ? (
-          <div className="error-message">
-            <p>Error: {error}</p>
-            <button onClick={loadScenario}>Try Again</button>
-          </div>
-        ) : (
-          <div className="scenario-display">
+
+      <main className="main">
+        <div className="scenario-section">
+          <h1>Absurd Crisis Simulation</h1>
+          
+          <button 
+            className="generate-btn"
+            onClick={generateScenario}
+            disabled={simulation.isLoading}
+          >
+            {simulation.isLoading ? 'Generating...' : 'Generate Scenario'}
+          </button>
+
+          {simulation.error && (
+            <div className="error">Error: {simulation.error}</div>
+          )}
+
+          {simulation.currentScenario && (
             <div className="scenario-content">
-              <h2>Situation</h2>
-              <p>{scenario.situation_description}</p>
+              <h2>Current Scenario</h2>
+              <p>{simulation.currentScenario.situation_description}</p>
               
-              {scenario.user_role && (
-                <div className="user-role">
+              {simulation.currentScenario.user_role && (
+                <div className="role-section">
                   <h3>Your Role</h3>
-                  <p>{scenario.user_role}</p>
+                  <p>{simulation.currentScenario.user_role}</p>
                 </div>
               )}
               
-              {scenario.user_prompt && (
-                <div className="user-prompt">
+              {simulation.currentScenario.user_prompt && (
+                <div className="prompt-section">
                   <h3>Your Task</h3>
-                  <p>{scenario.user_prompt}</p>
+                  <p>{simulation.currentScenario.user_prompt}</p>
                 </div>
               )}
-            </div>
-            
-            {scenario.video_url && (
-              <div className="media-section">
-                <h2>Scenario Video</h2>
-                <p className="media-info">The video will be accompanied by narration audio. Use the unified play button when both are ready.</p>
-                <MediaHandler 
-                  src={scenario.video_url} 
-                  audioSrc={scenario.audio_url}
-                  type="video/mp4" 
-                  width="100%" 
-                  height="auto"
+
+              <div className="response-section">
+                <h3>Your Response</h3>
+                <textarea 
+                  placeholder="How do you respond to this situation?"
+                  rows={5}
                 />
+                <button className="submit-btn">Submit Response</button>
               </div>
-            )}
-            
-            {scenario.audio_url && !scenario.video_url && (
-              <div className="audio-section">
-                <h2>Narration</h2>
-                <audio controls style={{ width: '100%' }}>
-                  <source src={scenario.audio_url} type="audio/mpeg" />
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
-            )}
-            
-            <div className="response-section">
-              <h2>Your Response</h2>
-              <textarea 
-                placeholder="Type your response here..."
-                rows={5}
-                className="response-input"
-              />
-              <button className="submit-button">Submit Response</button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
-      
+
       <style jsx>{`
-        .simulation-container {
-          max-width: 900px;
-          margin: 0 auto;
-          padding: 20px;
+        .container {
+          min-height: 100vh;
+          background: #1a1a1a;
+          color: #ffffff;
         }
-        
+
+        .main {
+          padding: 2rem;
+          max-width: 800px;
+          margin: 0 auto;
+        }
+
         h1 {
           text-align: center;
-          margin-bottom: 30px;
+          margin-bottom: 2rem;
+          color: #ffffff;
         }
-        
-        .scenario-display {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        
-        .media-section, .audio-section {
-          border: 1px solid #eaeaea;
-          border-radius: 8px;
-          padding: 20px;
-          background-color: #f9f9f9;
-        }
-        
-        .media-info {
-          font-size: 14px;
-          color: #666;
-          margin-bottom: 10px;
-          font-style: italic;
-        }
-        
-        .response-input {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-family: inherit;
-          resize: vertical;
-        }
-        
-        .submit-button {
-          margin-top: 10px;
-          padding: 10px 20px;
-          background-color: #0070f3;
+
+        .generate-btn {
+          display: block;
+          margin: 2rem auto;
+          padding: 1rem 2rem;
+          font-size: 1.2rem;
+          background: #4CAF50;
           color: white;
           border: none;
           border-radius: 4px;
           cursor: pointer;
-          font-size: 16px;
+          transition: background 0.2s;
         }
-        
-        .submit-button:hover {
-          background-color: #0051cc;
+
+        .generate-btn:hover {
+          background: #45a049;
         }
-        
-        .loading, .error-message {
+
+        .generate-btn:disabled {
+          background: #666;
+          cursor: not-allowed;
+        }
+
+        .scenario-content {
+          background: #2a2a2a;
+          padding: 2rem;
+          border-radius: 8px;
+          margin-top: 2rem;
+        }
+
+        .role-section, .prompt-section {
+          margin: 1.5rem 0;
+          padding: 1rem;
+          background: #333;
+          border-radius: 4px;
+        }
+
+        h2, h3 {
+          color: #4CAF50;
+          margin-bottom: 1rem;
+        }
+
+        .response-section {
+          margin-top: 2rem;
+        }
+
+        textarea {
+          width: 100%;
+          padding: 1rem;
+          margin: 1rem 0;
+          background: #333;
+          border: 1px solid #444;
+          color: white;
+          border-radius: 4px;
+          font-family: inherit;
+        }
+
+        .submit-btn {
+          padding: 0.8rem 1.5rem;
+          background: #2196F3;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+
+        .submit-btn:hover {
+          background: #1976D2;
+        }
+
+        .error {
+          color: #ff6b6b;
           text-align: center;
-          margin: 40px 0;
+          margin: 1rem 0;
         }
       `}</style>
     </div>
   );
 }
-
-// SSR to load initial scenario if available
-export async function getServerSideProps() {
-  try {
-    // This would normally fetch from your API endpoint
-    // For testing, return null to trigger client-side loading
-    return {
-      props: {
-        initialScenario: null
-      }
-    };
-  } catch (error) {
-    return {
-      props: {
-        initialScenario: null
-      }
-    };
-  }
-} 
