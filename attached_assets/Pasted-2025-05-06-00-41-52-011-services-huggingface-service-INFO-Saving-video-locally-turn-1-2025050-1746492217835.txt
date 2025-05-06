@@ -1,0 +1,19 @@
+2025-05-06 00:41:52,011 - services.huggingface_service - INFO - Saving video locally: turn_1_20250506004152.mp4
+2025-05-06 00:41:52,012 - utils.media - INFO - Public media directories created/verified: /home/runner/workspace/public/media/videos, /home/runner/workspace/public/media/audio
+2025-05-06 00:41:52,017 - utils.media - INFO - Saved video to public directory: /home/runner/workspace/public/media/videos/turn_1_20250506004152.mp4
+2025-05-06 00:41:52,017 - services.huggingface_service - INFO - Video saved locally. Public URL: /media/videos/turn_1_20250506004152.mp4
+2025-05-06 00:41:52,017 - services.media_service - ERROR - Video file not found or empty at path: /home/runner/workspace/media/videos/turn_1_20250506004152.mp4
+2025-05-06 00:41:52,018 - services.media_service - ERROR - No valid video content could be obtained or processed.
+2025-05-06 00:41:52,018 - services.media_service - INFO - [1746492112.02] asyncio.gather completed.
+2025-05-06 00:41:52,018 - services.media_service - INFO - [1746492112.02] Processing video result...
+2025-05-06 00:41:52,018 - services.media_service - WARNING - Video generation task returned None.
+2025-05-06 00:41:52,018 - services.media_service - INFO - [1746492112.02] Processing audio result...
+2025-05-06 00:41:52,018 - services.media_service - INFO - [1746492112.02] Audio generation task finished successfully: /media/audio/turn_1_1746492103.mp3
+2025-05-06 00:41:52,018 - services.media_service - INFO - Verifying local audio file at: /home/runner/workspace/public/media/audio/turn_1_1746492103.mp3
+2025-05-06 00:41:52,018 - services.media_service - INFO - Local audio file verified successfully.
+2025-05-06 00:41:52,018 - services.media_service - INFO - Parallel media generation for turn 1 completed in 11.70 seconds. Video: None, Audio: /media/audio/turn_1_1746492103.mp3
+INFO:     172.31.128.29:32916 - "POST /api/simulations HTTP/1.1" 201 Created
+INFO:     ('172.31.128.29', 32776) - "WebSocket /api/ws/simulations/sim_20250506004137" [accepted]
+INFO:     connection open
+INFO:     172.31.128.29:32916 - "GET /media/audio/turn_1_1746492103.mp3 HTTP/1.1" 404 Not Found
+INFO:     172.31.128.29:32916 - "GET /media/audio/turn_1_1746492103.mp3 HTTP/1.1" 404 Not Found
