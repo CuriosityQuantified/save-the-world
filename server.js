@@ -9,16 +9,24 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const server = express();
-  
-  // Serve media files from the public directory
-  server.use('/media', express.static(path.join(process.cwd(), 'public', 'media')));
+
+  // Serve static files from public directory
+  server.use(express.static(path.join(process.cwd(), 'public')));
   
   // Handle Next.js specific routes first
   server.get('/_next/*', (req, res) => {
     return handle(req, res);
   });
 
-  // Handle all other routes with Next.js, ensuring proper parameter handling
+  // Serve media files with explicit path
+  server.use('/media', express.static(path.join(process.cwd(), 'public', 'media')));
+
+  // API routes
+  server.get('/api/*', (req, res) => {
+    return handle(req, res);
+  });
+
+  // Handle all other routes with Next.js
   server.get('*', (req, res) => {
     return handle(req, res);
   });
@@ -27,6 +35,5 @@ app.prepare().then(() => {
   server.listen(PORT, '0.0.0.0', (err) => {
     if (err) throw err;
     console.log(`> Ready on http://0.0.0.0:${PORT}`);
-    console.log(`> Media files served from ${path.join(process.cwd(), 'public', 'media')}`);
   });
 });
