@@ -220,8 +220,7 @@ class MediaService:
 
             # Save the audio locally
             logger.info("Saving audio locally as fallback.")
-            paths = save_media_file(audio_data, "audio", filename)
-            public_url = paths.get('public_url') if paths else None
+            public_url = save_media_file(audio_data, "audio", filename)
 
             logger.info(
                 f"Audio generation complete (local save): {public_url}")
@@ -304,10 +303,9 @@ class MediaService:
                 )
                 # Optional: Verify the file exists locally if the URL is local
                 if video_url.startswith('/media/'):
-                    # Construct the absolute local path from the public URL
-                    # Assumes PUBLIC_DIR is '/home/runner/workspace/public'
+                    # Verify using the same path where we saved the file
                     local_check_path = os.path.join(
-                        os.getenv('WORKSPACE_DIR', '/home/runner/workspace'),
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         'public', video_url.lstrip('/'))
                     logger.info(
                         f"Verifying local video file at: {local_check_path}")
