@@ -4,7 +4,8 @@
     "next": "^15.3.1"
   },
   "scripts": {
-    "dev": "node server.js",
-    "start": "NODE_ENV=production node server.js"
+    "dev": "NODE_ENV=development node server.js",
+    "start": "NODE_ENV=production node server.js",
+    "build": "next build"
   }
 }
