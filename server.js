@@ -9,11 +9,16 @@ const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const server = express();
-
+  
   // Serve media files from the public directory
   server.use('/media', express.static(path.join(process.cwd(), 'public', 'media')));
   
-  // Handle all other routes with Next.js
+  // Handle Next.js specific routes first
+  server.get('/_next/*', (req, res) => {
+    return handle(req, res);
+  });
+
+  // Handle all other routes with Next.js, ensuring proper parameter handling
   server.get('*', (req, res) => {
     return handle(req, res);
   });
