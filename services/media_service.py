@@ -156,16 +156,24 @@ class MediaService:
                               str) and fn_from_tuple.endswith('.mp4'):
                     filename = fn_from_tuple  # Use filename from tuple
 
-            # Save locally
+            # Save to Replit Object Storage
             if video_content:
-                logger.info("Saving video locally as fallback.")
-                # Ensure filename is set if not derived earlier
+                logger.info("Saving video to Replit Object Storage")
+                from replit.object_storage import Client
+                client = Client()
+                
                 if not filename:
                     filename = f"turn_{turn}_{int(time.time())}.mp4"
-                paths = save_media_file(video_content, "video", filename)
-                public_url = paths.get('public_url') if paths else None
-                logger.info(f"Saved video content to local file: {public_url}")
-                return public_url
+                object_key = f"videos/{filename}"
+                
+                try:
+                    client.upload_from_bytes(object_key, video_content)
+                    public_url = f"/media/videos/{filename}"
+                    logger.info(f"Saved video to Object Storage: {public_url}")
+                    return public_url
+                except Exception as e:
+                    logger.error(f"Error saving to Object Storage: {e}")
+                    return None
             else:
                 logger.error(
                     "No valid video content could be obtained or processed.")
