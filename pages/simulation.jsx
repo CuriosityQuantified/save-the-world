@@ -43,13 +43,6 @@ export default function SimulationPage({ initialScenario }) {
     }
   };
 
-  // Load scenario on initial page load
-  useEffect(() => {
-    if (!initialScenario) {
-      loadScenario();
-    }
-  }, [initialScenario]);
-
   // Function to handle user response submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -150,222 +143,171 @@ export default function SimulationPage({ initialScenario }) {
   }, []); // Empty dependency array ensures this runs only once on mount
 
   return (
-    <div
-      style={{
-        backgroundImage: "url(/UI_background.jpeg)", // Use the image from public folder
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        minHeight: "100vh", // Ensure it covers the full viewport height
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center", // Center the arcade machine content area
-        position: "relative", // Needed for absolute positioning of children
-        fontFamily: '"Press Start 2P", cursive', // Example pixel font
-        color: "#fff", // Default text color
-      }}
-    >
+    <div style={{
+      backgroundImage: "url(/UI_background.jpeg)",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      minHeight: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      position: "relative",
+      fontFamily: '"Press Start 2P", cursive',
+      color: "#fff",
+    }}>
       <Head>
-        <title>Arcade Simulation</title>
-        {/* Add pixel font link if needed */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-          rel="stylesheet"
-        />
+        <title>Simulation Arcade</title>
+        <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Area representing the arcade screen */}
-      {/* Adjust top, left, width, height based on the image dimensions and screen location */}
-      <div
-        style={{
-          position: "absolute",
-          top: "22%", // Approximate top position of the screen
-          left: "50%", // Center horizontally
-          transform: "translateX(-50%)", // Correct centering
-          width: "56%", // Approximate width of the screen area
-          height: "50%", // Approximate height of the screen area
-          backgroundColor: "rgba(0, 0, 0, 0.8)", // Semi-transparent black background for readability
-          border: "5px solid #333", // Optional border to mimic screen frame
-          borderRadius: "10px", // Optional rounded corners
-          padding: "20px",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden", // Hide overflow
-        }}
-      >
-        {/* Top Section: Video Player & Scenario */}
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            gap: "15px",
-            marginBottom: "15px",
+      {/* Arcade Screen Content Area */}
+      <div style={{
+        position: "absolute",
+        top: "22%",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "56%",
+        height: "50%",
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        border: "5px solid #333",
+        borderRadius: "10px",
+        padding: "20px",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}>
+        {/* Turn Counter */}
+        <div style={{
+          textAlign: "center",
+          marginBottom: "10px",
+          color: "#00ff00",
+          textShadow: "0 0 5px #00ff00",
+          fontSize: "0.8em",
+        }}>
+          TURN {turn}/{MAX_TURNS}
+        </div>
+
+        {/* Content Grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "15px",
+          flex: 1,
+          overflow: "hidden",
+        }}>
+          {/* Video Section */}
+          <div style={{
+            backgroundColor: "#111",
+            border: "2px solid #444",
+            borderRadius: "5px",
             overflow: "hidden",
-          }}
-        >
-          {/* Video Player Area */}
-          <div
-            style={{
-              flex: "0 0 60%",
-              backgroundColor: "#111",
-              border: "2px solid #444",
-              borderRadius: "5px",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              overflow: "hidden",
-            }}
-          >
-            {isLoading && !videoUrl && <p>Generating video...</p>}
-            {!isLoading && !videoUrl && <p>Video will appear here.</p>}
-            {videoUrl && (
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}>
+            {videoUrl ? (
               <video
                 key={videoUrl}
                 controls
                 autoPlay
                 muted
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  display: "block",
-                }}
+                style={{ maxWidth: "100%", maxHeight: "100%" }}
               >
                 <source src={videoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
+            ) : (
+              <p style={{ color: "#666", textAlign: "center" }}>
+                {isLoading ? "Generating video..." : "Video will appear here"}
+              </p>
             )}
           </div>
 
-          {/* Scenario & Narration Area */}
-          <div
-            style={{
+          {/* Scenario Section */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            overflow: "hidden",
+          }}>
+            <div style={{
               flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-              overflowY: "auto",
-              paddingRight: "10px",
-            }}
-          >
-            {/* Scenario Text */}
-            <div
-              style={{
-                backgroundColor: "#222",
-                border: "2px solid #444",
-                padding: "10px",
-                borderRadius: "5px",
-                flexShrink: 0,
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.1em",
-                  marginBottom: "5px",
-                  borderBottom: "1px solid #555",
-                  paddingBottom: "5px",
-                }}
-              >
-                Scenario (Turn {turn}/{MAX_TURNS})
-              </h2>
-              {isLoading && !scenario && <p>Loading scenario...</p>}
-              <p style={{ fontSize: "0.9em", lineHeight: "1.4" }}>{scenario}</p>
+              backgroundColor: "#222",
+              border: "2px solid #444",
+              padding: "10px",
+              borderRadius: "5px",
+              overflow: "auto",
+              fontSize: "0.8em",
+              lineHeight: "1.4",
+            }}>
+              {isLoading ? "Loading scenario..." : scenario}
             </div>
 
-            {/* Narration Audio */}
+            {/* Audio Player */}
             {narrationUrl && (
-              <div
-                style={{
-                  backgroundColor: "#222",
-                  border: "2px solid #444",
-                  padding: "10px",
-                  borderRadius: "5px",
-                  flexShrink: 0,
-                }}
+              <audio
+                key={narrationUrl}
+                controls
+                style={{ width: "100%" }}
               >
-                <h3 style={{ fontSize: "1em", marginBottom: "5px" }}>
-                  Narration
-                </h3>
-                <audio key={narrationUrl} controls style={{ width: "100%" }}>
-                  <source src={narrationUrl} type="audio/mpeg" />
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
+                <source src={narrationUrl} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
             )}
-            {isLoading && !narrationUrl && <p>Generating narration...</p>}
           </div>
         </div>
 
-        {/* Bottom Section: User Input */}
-        <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px" }}>
+        {/* Input Section */}
+        <form onSubmit={handleSubmit} style={{
+          marginTop: "15px",
+          display: "flex",
+          gap: "10px",
+        }}>
           <input
             ref={inputRef}
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={
-              isLoading
-                ? "Waiting for next turn..."
-                : turn > MAX_TURNS
-                  ? "Simulation Complete."
-                  : "Enter your response..."
-            }
-            disabled={isLoading || turn > MAX_TURNS}
+            placeholder={isLoading ? "Waiting..." : "Enter your response..."}
+            disabled={isLoading || turn >= MAX_TURNS}
             style={{
-              flexGrow: 1,
-              padding: "10px",
+              flex: 1,
+              padding: "8px",
+              backgroundColor: "#111",
               border: "2px solid #444",
               borderRadius: "5px",
-              backgroundColor: "#111",
               color: "#fff",
-              fontFamily: "inherit", // Inherit pixel font
-              fontSize: "1em",
+              fontFamily: "inherit",
+              fontSize: "0.8em",
             }}
           />
           <button
             type="submit"
-            disabled={isLoading || turn > MAX_TURNS || !userInput.trim()}
+            disabled={isLoading || turn >= MAX_TURNS || !userInput.trim()}
             style={{
-              padding: "10px 15px",
-              border: "2px solid #444",
+              padding: "8px 15px",
+              backgroundColor: "#3a3",
+              border: "none",
               borderRadius: "5px",
-              backgroundColor: "#3a3", // Greenish button
               color: "#fff",
               fontFamily: "inherit",
-              fontSize: "1em",
+              fontSize: "0.8em",
               cursor: "pointer",
-              opacity:
-                isLoading || turn > MAX_TURNS || !userInput.trim() ? 0.5 : 1,
+              opacity: isLoading || turn >= MAX_TURNS || !userInput.trim() ? 0.5 : 1,
             }}
           >
-            Send
+            SEND
           </button>
         </form>
-
-        {/* Optional Chat History Area (if needed within the screen) */}
-        {/* <div ref={chatContainerRef} style={{ flexGrow: 1, overflowY: 'auto', marginTop: '10px', border: '1px solid #ccc', padding: '5px' }}>
-          {history.map((msg, index) => (
-            <p key={index} style={{ color: msg.role === 'user' ? 'lightgreen' : 'lightblue' }}>
-              <strong>{msg.role === 'user' ? 'You:' : 'System:'}</strong> {msg.content}
-            </p>
-          ))}
-          <div ref={chatEndRef} />
-        </div> */}
       </div>
-
-      {/* Floating turn counter or other UI elements outside the screen if desired */}
-      {/* <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.7)', padding: '5px 10px', borderRadius: '5px' }}>
-          Turn: {turn}/{MAX_TURNS}
-      </div> */}
     </div>
   );
 }
 
-// SSR to load initial scenario if available
+// Keep the getServerSideProps function unchanged
 export async function getServerSideProps() {
   try {
-    // This would normally fetch from your API endpoint
-    // For testing, return null to trigger client-side loading
     return {
       props: {
         initialScenario: null,
