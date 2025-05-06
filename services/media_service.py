@@ -67,34 +67,11 @@ class MediaService:
             'url_expiry': cloudflare_r2_url_expiry
         }
 
-        # Initialize Cloudflare R2 service if credentials are provided
+        # Initialize local storage by default
         self.r2_service = None
-        if all([
-                cloudflare_r2_endpoint, cloudflare_r2_access_key_id,
-                cloudflare_r2_secret_access_key, cloudflare_r2_bucket_name
-        ]):
-            try:
-                logger.info(
-                    "Initializing Cloudflare R2 service for media storage")
-                self.r2_service = CloudflareR2Service(
-                    endpoint=cloudflare_r2_endpoint,
-                    access_key_id=cloudflare_r2_access_key_id,
-                    secret_access_key=cloudflare_r2_secret_access_key,
-                    bucket_name=cloudflare_r2_bucket_name,
-                    public_access=cloudflare_r2_public_access,
-                    url_expiry=cloudflare_r2_url_expiry)
-                logger.info(
-                    f"Cloudflare R2 service initialized successfully (Public access: {cloudflare_r2_public_access})"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to initialize Cloudflare R2 service: {e}")
-                logger.error(traceback.format_exc())
-                self.r2_service = None
-        else:
-            logger.warning(
-                "Cloudflare R2 credentials not provided, media storage will not be persistent"
-            )
+        logger.info("Using local file storage for media files")
+        # Ensure media directories exist
+        ensure_media_directories()
 
         # Initialize services
         self.huggingface_service = HuggingFaceService(
@@ -179,25 +156,7 @@ class MediaService:
                               str) and fn_from_tuple.endswith('.mp4'):
                     filename = fn_from_tuple  # Use filename from tuple
 
-            # Now, upload if we have content and R2 is configured
-            if video_content and self.r2_service:
-                try:
-                    logger.info(
-                        f"Attempting to upload video '{filename}' to Cloudflare R2..."
-                    )
-                    r2_url = await asyncio.to_thread(
-                        self.r2_service.upload_video,
-                        video_content,
-                        filename=filename)
-                    logger.info(f"Video successfully uploaded to R2: {r2_url}")
-                    return r2_url
-                except Exception as r2_err:
-                    logger.error(
-                        f"Failed to upload video to R2: {r2_err}. Falling back to local save."
-                    )
-                    # Fall through to local save below
-
-            # Fallback: Save locally if R2 is not configured, upload failed, or no content found
+            # Save locally
             if video_content:
                 logger.info("Saving video locally as fallback.")
                 # Ensure filename is set if not derived earlier
@@ -259,42 +218,7 @@ class MediaService:
             # Generate filename
             filename = f"turn_{turn}_{int(time.time())}.mp3"
 
-            # Try uploading to R2 if configured
-            if self.r2_service:
-                try:
-                    logger.info(
-                        f"Attempting to upload audio '{filename}' to Cloudflare R2..."
-                    )
-                    paths = self.r2_service.upload_object(audio_data, filename)
-
-                    # Check if paths is a dictionary (expected structure) or a string (direct URL)
-                    if isinstance(paths, dict):
-                        public_url = paths.get('public_url')
-                    elif isinstance(paths, str):
-                        # Assume it's the direct URL if r2_service.upload_object returns a string
-                        public_url = paths
-                    else:
-                        # Handle unexpected return type
-                        public_url = None
-                        logger.warning(
-                            f"Unexpected return type from r2_service.upload_object: {type(paths)}. Setting public_url to None."
-                        )
-
-                    if public_url:
-                        logger.info(f"Audio uploaded to R2: {public_url}")
-                        return public_url
-                    else:
-                        logger.error(
-                            f"Failed to get public URL after R2 upload. Upload result: {paths}"
-                        )
-                        return None  # Return None if URL couldn't be determined
-                except Exception as r2_err:
-                    logger.error(
-                        f"Failed to upload audio to R2: {r2_err}. Falling back to local save."
-                    )
-                    # Fall through to local save below
-
-            # Fallback: Save the audio locally
+            # Save the audio locally
             logger.info("Saving audio locally as fallback.")
             paths = save_media_file(audio_data, "audio", filename)
             public_url = paths.get('public_url') if paths else None
