@@ -265,30 +265,25 @@ class MediaService:
                     logger.info(
                         f"Attempting to upload audio '{filename}' to Cloudflare R2..."
                     )
-                    paths = self.r2_service.upload_object(audio_data, filename)
+                    public_url = await asyncio.to_thread(
+                        self.r2_service.upload_audio, audio_data, filename)
 
-                    # Check if paths is a dictionary (expected structure) or a string (direct URL)
-                    if isinstance(paths, dict):
-                        public_url = paths.get('public_url')
-                    elif isinstance(paths, str):
-                        # Assume it's the direct URL if r2_service.upload_object returns a string
-                        public_url = paths
-                    else:
-                        # Handle unexpected return type
-                        public_url = None
-                        logger.warning(
-                            f"Unexpected return type from r2_service.upload_object: {type(paths)}. Setting public_url to None."
-                        )
-
-                    if public_url:
+                    # Check if a valid URL was returned
+                    if public_url and isinstance(
+                            public_url, str) and public_url.startswith("http"):
                         logger.info(f"Audio uploaded to R2: {public_url}")
                         return public_url
                     else:
+                        # Log if the upload method didn't return a valid URL string
                         logger.error(
-                            f"Failed to get public URL after R2 upload. Upload result: {paths}"
+                            f"R2 upload_audio did not return a valid URL. Result: {public_url}"
                         )
-                        return None  # Return None if URL couldn't be determined
+                        # Fall through to local save below
+                        raise CloudflareR2ServiceError(
+                            "R2 upload failed to return a valid URL.")
+
                 except Exception as r2_err:
+                    # Log the specific error from R2 upload attempt before falling back
                     logger.error(
                         f"Failed to upload audio to R2: {r2_err}. Falling back to local save."
                     )
@@ -296,12 +291,17 @@ class MediaService:
 
             # Fallback: Save the audio locally
             logger.info("Saving audio locally as fallback.")
-            paths = save_media_file(audio_data, "audio", filename)
-            public_url = paths.get('public_url') if paths else None
+            # Assuming save_media_file returns the public URL string directly
+            public_url = save_media_file(audio_data, "audio", filename)
 
-            logger.info(
-                f"Audio generation complete (local save): {public_url}")
-            return public_url
+            # Log whether the local save returned a valid path
+            if public_url:
+                logger.info(
+                    f"Audio generation complete (local save): {public_url}")
+            else:
+                logger.error("Local save of audio failed to return a path.")
+
+            return public_url  # Return the path from local save or None
 
         except Exception as e:
             logger.error(f"Error generating audio: {str(e)}")
@@ -360,84 +360,42 @@ class MediaService:
 
             # Process video result
             logger.info(f"[{time.time():.2f}] Processing video result...")
-            video_task_result = results[0]
-            if isinstance(video_task_result, Exception):
+            if isinstance(results[0], Exception):
                 logger.error(
-                    f"Video generation task failed with exception: {video_task_result}"
+                    f"Video generation task failed with exception: {results[0]}"
                 )
+                # Log the full traceback if available
                 tb_str = ''.join(
-                    traceback.format_exception(
-                        etype=type(video_task_result),
-                        value=video_task_result,
-                        tb=video_task_result.__traceback__))
+                    traceback.format_exception(etype=type(results[0]),
+                                               value=results[0],
+                                               tb=results[0].__traceback__))
                 logger.error(f"Video generation traceback:\n{tb_str}")
-            elif video_task_result is None:
+            elif results[0] is None:
                 logger.warning(f"Video generation task returned None.")
-            elif isinstance(video_task_result, str):  # Expecting a URL string
-                video_url = video_task_result
+            else:
+                video_url = results[0]
                 logger.info(
                     f"[{time.time():.2f}] Video generation task finished successfully: {video_url}"
-                )
-                # Optional: Verify the file exists locally if the URL is local
-                if video_url.startswith('/media/'):
-                    # Construct the absolute local path from the public URL
-                    # Assumes PUBLIC_DIR is '/home/runner/workspace/public'
-                    local_check_path = os.path.join(
-                        os.getenv('WORKSPACE_DIR', '/home/runner/workspace'),
-                        'public', video_url.lstrip('/'))
-                    logger.info(
-                        f"Verifying local video file at: {local_check_path}")
-                    if not os.path.exists(local_check_path) or os.path.getsize(
-                            local_check_path) == 0:
-                        logger.error(
-                            f"Video file verification failed: Not found or empty at {local_check_path}"
-                        )
-                        video_url = None  # Invalidate URL if local file is missing
-                    else:
-                        logger.info(f"Local video file verified successfully.")
-            else:
-                logger.warning(
-                    f"Video generation task returned unexpected type: {type(video_task_result)}. Expected URL string or None."
                 )
 
             # Process audio result
             logger.info(f"[{time.time():.2f}] Processing audio result...")
-            audio_task_result = results[1]
-            if isinstance(audio_task_result, Exception):
+            if isinstance(results[1], Exception):
                 logger.error(
-                    f"Audio generation task failed with exception: {audio_task_result}"
+                    f"Audio generation task failed with exception: {results[1]}"
                 )
+                # Log the full traceback if available
                 tb_str = ''.join(
-                    traceback.format_exception(
-                        etype=type(audio_task_result),
-                        value=audio_task_result,
-                        tb=audio_task_result.__traceback__))
+                    traceback.format_exception(etype=type(results[1]),
+                                               value=results[1],
+                                               tb=results[1].__traceback__))
                 logger.error(f"Audio generation traceback:\n{tb_str}")
-            elif audio_task_result is None:
+            elif results[1] is None:
                 logger.warning(f"Audio generation task returned None.")
-            elif isinstance(audio_task_result, str):  # Expecting a URL string
-                audio_url = audio_task_result
+            else:
+                audio_url = results[1]
                 logger.info(
                     f"[{time.time():.2f}] Audio generation task finished successfully: {audio_url}"
-                )
-                # Optional: Verify the file exists locally if the URL is local
-                if audio_url.startswith('/media/'):
-                    local_check_path = os.path.join(
-                        os.getenv('WORKSPACE_DIR', '/home/runner/workspace'),
-                        'public', audio_url.lstrip('/'))
-                    logger.info(
-                        f"Verifying local audio file at: {local_check_path}")
-                    if not os.path.exists(local_check_path) or os.path.getsize(
-                            local_check_path) == 0:
-                        logger.error(
-                            f"Audio file verification failed: Not found or empty at {local_check_path}"
-                        )
-                        audio_url = None  # Invalidate URL if local file is missing
-                    else:
-                        logger.info(f"Local audio file verified successfully.")
-            else:
-                logger.warning(
-                    f"Audio generation task returned unexpected type: {type(audio_task_result)}. Expected URL string or None."
                 )
 
             end_time = time.time()
