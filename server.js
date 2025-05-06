@@ -14,7 +14,7 @@ app.prepare().then(() => {
   server.use('/media', express.static(path.join(process.cwd(), 'public', 'media')));
   
   // Handle all other routes with Next.js
-  server.all('*', (req, res) => {
+  server.get('*', (req, res) => {
     return handle(req, res);
   });
 
