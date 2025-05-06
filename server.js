@@ -20,9 +20,10 @@ app.prepare().then(() => {
   server.use(express.static('public'));
 
   // Handle media file requests
-  server.get('/media/:type/:filename', async (req, res) => {
+  server.get('/media/:type/*', async (req, res) => {
     try {
-      const { type, filename } = req.params;
+      const { type } = req.params;
+      const filename = req.params[0]; // Get the rest of the path
       const objectKey = `${type}/${filename}`;
       
       const data = await client.download_as_bytes(objectKey);
