@@ -104,7 +104,6 @@ def init_services():
         llm_service = LLMService(
             api_key=groq_api_key,
             default_model_name="qwen-qwq-32b",
-            google_api_key=gemini_api_key
         )
         state_service = StateService()
         media_service = MediaService(

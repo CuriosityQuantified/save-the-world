@@ -33,7 +33,7 @@ class GroqTTSService:
         """
         self.groq_api_key = groq_api_key
         self.client = Groq(api_key=groq_api_key)
-        self.default_voice = "Eleanor-PlayAI"  # Default Groq TTS voice
+        self.default_voice = "Aaliyah-PlayAI"  # Default Groq TTS voice, changed from Eleanor-PlayAI
         
     def _blocking_generate_and_read(self, text: str, voice: str) -> bytes:
         """

@@ -19,17 +19,25 @@ from models.simulation import LLMLog
 from prompts import (INITIAL_CRISIS_EXAMPLES_JSON,
                      FOLLOW_UP_CRISIS_EXAMPLE_JSON,
                      FINAL_CONCLUSION_EXAMPLE_JSON)
-from prompts.scenario_generation_prompt import get_formatted_prompt_template
+from prompts.scenario_generation_prompt import (
+    get_formatted_prompt_template,
+    PERSONALITY_DESCRIPTION,
+    CONTEXT,
+    ABSURDITY_PRINCIPLES
+)
 from prompts.video_description_generation_prompt import VIDEO_PROMPT_TEMPLATE
 
 # Add direct groq client import for JSON mode
 from groq import Groq
 
 # Add Google Gemini imports
-import google.generativeai as genai
-from langchain_google_genai import ChatGoogleGenerativeAI
+# import google.generativeai as genai # Removed Gemini
+# from langchain_google_genai import ChatGoogleGenerativeAI # Removed Gemini
 
 import re
+
+# Import HuggingFaceService
+from services.huggingface_service import HuggingFaceService
 
 logger = logging.getLogger(__name__)
 
@@ -45,42 +53,44 @@ class LLMService:
     def __init__(self,
                  api_key: str,
                  default_model_name: str = "qwen-qwq-32b",
-                 google_api_key: str = None):
+                 # google_api_key: str = None, # Removed Gemini
+                 huggingface_service: Optional[HuggingFaceService] = None):
         """
         Initialize the LLM service.
         
         Args:
             api_key: The Groq API key
             default_model_name: The default model to use for generation
-            google_api_key: The Google API key for Gemini models
+            # google_api_key: The Google API key for Gemini models # Removed Gemini
+            huggingface_service: Optional instance of HuggingFaceService for video generation
         """
         self.groq_api_key = api_key
-        self.google_api_key = google_api_key or os.environ.get(
-            "GOOGLE_API_KEY")
+        # self.google_api_key = google_api_key or os.environ.get("GOOGLE_API_KEY") # Removed Gemini
         self.default_model_name = default_model_name
+        self.huggingface_service = huggingface_service
 
         # Initialize Google Gemini API client if key is provided
-        if self.google_api_key:
-            genai.configure(api_key=self.google_api_key)
+        # if self.google_api_key: # Removed Gemini
+            # genai.configure(api_key=self.google_api_key) # Removed Gemini
             # Set up Gemini model configurations
-            self.gemini_model_name = "gemini-2.5-flash-preview-04-17"  # Update to Gemini 2.5 Flash
+            # self.gemini_model_name = "gemini-2.5-flash-preview-04-17"  # Update to Gemini 2.5 Flash # Removed Gemini
 
             # Set up generation config for Gemini
-            self.gemini_config = genai.types.GenerationConfig(
-                temperature=0.6,
-                top_p=0.95,
-                top_k=64,
-                max_output_tokens=8192,
-            )
+            # self.gemini_config = genai.types.GenerationConfig( # Removed Gemini
+            #     temperature=0.6, # Removed Gemini
+            #     top_p=0.95, # Removed Gemini
+            #     top_k=64, # Removed Gemini
+            #     max_output_tokens=8192, # Removed Gemini
+            # ) # Removed Gemini
 
         # Model-specific configurations
         self.model_configs = {
             "compound-beta-mini": {
                 "temperature": 1.0
             },
-            "gemini-2.5-flash-preview-04-17": {
-                "temperature": 1.0
-            },
+            # "gemini-2.5-flash-preview-04-17": { # Removed Gemini
+            #     "temperature": 1.0 # Removed Gemini
+            # }, # Removed Gemini
         }
 
         # Create model instances
@@ -99,7 +109,7 @@ class LLMService:
         # Pre-initialize the scenarios dictionary with all possible scenario IDs
         self._pre_initialize_scenarios_dict()
 
-    def _pre_initialize_scenarios_dict(self, max_turns: int = 6):
+    def _pre_initialize_scenarios_dict(self, max_turns: int = 5):
         """
         Pre-initialize the scenarios dictionary with all possible scenario IDs.
         
@@ -128,23 +138,23 @@ class LLMService:
             config = self.model_configs.get(model_name, {"temperature": 1.0})
 
             # Check if this is a Gemini model
-            if model_name.startswith("gemini-"):
-                if not self.google_api_key:
-                    logger.warning(
-                        "Google API key not provided, falling back to Groq model"
-                    )
-                    return self._get_llm_instance(self.default_model_name)
+            # if model_name.startswith("gemini-"): # Removed Gemini
+                # if not self.google_api_key: # Removed Gemini
+                    # logger.warning( # Removed Gemini
+                        # "Google API key not provided, falling back to Groq model" # Removed Gemini
+                    # ) # Removed Gemini
+                    # return self._get_llm_instance(self.default_model_name) # Removed Gemini
 
-                self.llm_instances[model_name] = ChatGoogleGenerativeAI(
-                    model=model_name,
-                    google_api_key=self.google_api_key,
-                    **config)
-            else:
+                # self.llm_instances[model_name] = ChatGoogleGenerativeAI( # Removed Gemini
+                    # model=model_name, # Removed Gemini
+                    # google_api_key=self.google_api_key, # Removed Gemini
+                    # **config) # Removed Gemini
+            # else: # Removed Gemini
                 # Default to Groq models
-                self.llm_instances[model_name] = ChatGroq(
-                    model_name=model_name,
-                    groq_api_key=self.groq_api_key,
-                    **config)
+            self.llm_instances[model_name] = ChatGroq(
+                model_name=model_name,
+                groq_api_key=self.groq_api_key,
+                **config)
 
         return self.llm_instances[model_name]
 
@@ -216,16 +226,21 @@ class LLMService:
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
 
-        # Models to try in order - Prioritize Maverick
-        # models_to_try = ["gemini-2.5-flash-preview-04-17", "compound-beta-mini", "qwen-qwq-32b"]
-        models_to_try = [
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "gemini-2.5-flash-preview-04-17", "compound-beta-mini",
-            "qwen-qwq-32b"
-        ]
-
         # Determine if this is the final turn
         is_final_turn = current_turn_number == max_turns
+
+        # Use qwen-qwq-32b for final turn, otherwise use the prioritized models list
+        if is_final_turn:
+            models_to_try = ["qwen-qwq-32b"]
+            logger.info("Using qwen-qwq-32b model for final turn (conclusion with grading)")
+        else:
+            # Models to try in order - Prioritize Maverick
+            models_to_try = [
+                "meta-llama/llama-4-maverick-17b-128e-instruct",
+                # "gemini-2.5-flash-preview-04-17", # Removed Gemini
+                "compound-beta-mini",
+                "qwen-qwq-32b"
+            ]
 
         # Determine the appropriate example JSON format based on turn number
         if is_final_turn:
@@ -235,16 +250,15 @@ class LLMService:
         else:
             example_json_output = FOLLOW_UP_CRISIS_EXAMPLE_JSON
 
-        # Update the example JSON to show we only need a single scenario
-        example_json_output = example_json_output.replace(
-            '"id": "scenario_', f'"id": "scenario_{current_turn_number}_')
-
         # Get the appropriate prompt template
         template = get_formatted_prompt_template(current_turn_number,
                                                  max_turns)
 
         # Format the prompt for direct use with Gemini
         formatted_prompt = template.format(
+            PERSONALITY_DESCRIPTION=PERSONALITY_DESCRIPTION,
+            CONTEXT=CONTEXT,
+            ABSURDITY_PRINCIPLES=ABSURDITY_PRINCIPLES,
             simulation_history=simulation_history,
             current_turn_number=current_turn_number,
             previous_turn_number=previous_turn_number,
@@ -260,27 +274,28 @@ class LLMService:
 
         for model_name in models_to_try:
             try:
-                if model_name.startswith("gemini-") and self.google_api_key:
-                    logger.info(f"Trying with model: {model_name}")
+                # if model_name.startswith("gemini-") and self.google_api_key: # Removed Gemini
+                    # logger.info(f"Trying with model: {model_name}") # Removed Gemini
                     # Google Gemini API
-                    start_time = time.time()
+                    # start_time = time.time() # Removed Gemini
                     # Set slightly more conservative parameters
-                    gemini_config = self.gemini_config
-                    gemini_config.temperature = 0.7  # Lower temperature for more reliable results
+                    # gemini_config = self.gemini_config # Removed Gemini
+                    # gemini_config.temperature = 0.7  # Lower temperature for more reliable results # Removed Gemini
 
-                    response = genai.generate_content(
-                        contents=formatted_prompt,
-                        generation_config=gemini_config,
+                    # response = genai.generate_content( # Removed Gemini
+                        # contents=formatted_prompt, # Removed Gemini
+                        # generation_config=gemini_config, # Removed Gemini
                         # Uncomment if using Vertex AI or specific safety settings
                         # safety_settings=self.safety_settings
-                    )
-                    result = response.text
-                    response_time = time.time() - start_time
-                    model_used = model_name
-                    logger.info(
-                        f"Successfully generated scenario using {model_name}")
-                    break  # Exit loop on success
-                elif model_name.startswith("meta-llama"):
+                    # ) # Removed Gemini
+                    # result = response.text # Removed Gemini
+                    # response_time = time.time() - start_time # Removed Gemini
+                    # model_used = model_name # Removed Gemini
+                    # logger.info( # Removed Gemini
+                        # f"Successfully generated scenario using {model_name}") # Removed Gemini
+                    # break  # Exit loop on success # Removed Gemini
+                # elif model_name.startswith("meta-llama"): # Removed Gemini
+                if model_name.startswith("meta-llama"): # Adjusted conditional
                     logger.info(f"Trying with Groq model: {model_name}")
                     # Use direct Groq client for JSON mode
                     start_time = time.time()
@@ -297,7 +312,7 @@ class LLMService:
                         }],
                         model=model_name,
                         temperature=
-                        0.7,  # Explicitly set temperature to 0.7 for Maverick
+                        1.0,  # Explicitly set temperature to 0.7 for Maverick
                         max_tokens=8192,
                         response_format={"type": "json_object"},
                     )
@@ -430,21 +445,20 @@ class LLMService:
 
     async def create_video_prompt(self,
                                   scenario: Dict[str, str],
-                                  turn_number: int = 1) -> str:
+                                  turn_number: int = 1) -> List[str]:
         """
-        Generate a video generation prompt from the scenario details.
+        Generate a video generation prompt from the scenario details,
+        parse it, and return a list of scene descriptions.
         
         Args:
-            scenario: The scenario dictionary with 'situation_description', 'user_role', and other fields
+            scenario: The scenario dictionary with 'situation_description'
             turn_number: The current turn number for logging
             
         Returns:
-            A prompt suitable for video generation
+            A list of four scene descriptions. Returns an empty list if parsing fails.
         """
-        # Combine the scenario details for the prompt
-        scenario_text = f"Situation: {scenario.get('situation_description', '')}\n"
-        scenario_text += f"User Role: {scenario.get('user_role', '')}\n"
-        scenario_text += f"User Prompt: {scenario.get('user_prompt', '')}"
+        # Use only the situation_description for the prompt
+        scenario_text = scenario.get('situation_description', '')
 
         # Use the imported prompt template
         prompt_template = VIDEO_PROMPT_TEMPLATE
@@ -452,7 +466,7 @@ class LLMService:
         # Format the prompt for direct use with the model
         formatted_prompt = prompt_template.format(scenario=scenario_text)
 
-        result = ""
+        raw_llm_output = ""
         model_used = "meta-llama/llama-4-maverick-17b-128e-instruct"  # Force use of meta-llama/llama-4-maverick-17b-128e-instruct
         response_time = None
 
@@ -460,39 +474,85 @@ class LLMService:
             # Directly use the specified Groq model
             start_time = time.time()
             groq_llm = self._get_llm_instance(model_used)
-            chain = LLMChain(llm=groq_llm,
-                             prompt=PromptTemplate(
-                                 input_variables=["scenario"],
-                                 template=prompt_template))
-            result = await chain.arun(scenario=scenario_text)
+            # Ensure the prompt template is correctly initialized for the chain
+            # The input_variables should match what VIDEO_PROMPT_TEMPLATE expects, which is 'scenario'
+            chain_prompt = PromptTemplate(input_variables=["scenario"], template=prompt_template)
+            chain = LLMChain(llm=groq_llm, prompt=chain_prompt)
+            
+            raw_llm_output = await chain.arun(scenario=scenario_text)
             end_time = time.time()
             response_time = end_time - start_time
             logger.info(
-                f"Generated video prompt using {model_used} (Response time: {response_time:.2f}s)"
+                f"Generated video prompt using {model_used} (Response time: {response_time:.2f}s). Output: {raw_llm_output[:200]}..." # Log a snippet
             )
 
             # Log the interaction
-            await self.log_interaction(turn_number, "create_video_prompt",
-                                       formatted_prompt, result, {},
+            await self.log_interaction(turn_number, "create_video_prompt_llm_call",
+                                       formatted_prompt, raw_llm_output, {},
                                        model_used, response_time)
+            
+            # Attempt to parse JSON, trying to extract from markdown if necessary
+            parsed_json = None
+            json_str = raw_llm_output.strip()
+
+            # Check if the output is wrapped in markdown code block for JSON
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", json_str, re.IGNORECASE)
+            if match:
+                json_str = match.group(1).strip()
+                logger.info(f"Extracted JSON string from markdown: {json_str[:200]}...")
+            
+            try:
+                parsed_json = json.loads(json_str)
+                scenes = parsed_json.get("scenes")
+                
+                if isinstance(scenes, list) and all(isinstance(s, str) for s in scenes) and len(scenes) == 4:
+                    logger.info(f"Successfully parsed {len(scenes)} scene descriptions.")
+                    return scenes
+                else:
+                    logger.error(
+                        f"Invalid structure in parsed JSON for video scenes. Expected list of 4 strings under 'scenes' key. Got: {type(scenes)} with content: {str(scenes)[:200]}..."
+                    )
+                    await self.log_interaction(
+                        turn_number,
+                        "create_video_prompt_parsing_error",
+                        formatted_prompt,
+                        f"Invalid JSON structure. Raw: {raw_llm_output[:500]}. Extracted/Processed: {json_str[:500]}. Parsed: {str(parsed_json)[:200]}",
+                        {},
+                        model_used,
+                        response_time
+                    )
+                    return [] # Return empty list on structure error
+
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"Failed to parse JSON from LLM output for video scenes: {str(e)}. Raw output snippet: {raw_llm_output[:500]}. Processed snippet for parsing: {json_str[:500]}"
+                )
+                await self.log_interaction(
+                    turn_number,
+                    "create_video_prompt_parsing_error",
+                    formatted_prompt,
+                    f"JSONDecodeError: {str(e)} - Raw: {raw_llm_output[:500]} - Processed: {json_str[:500]}",
+                    {},
+                    model_used,
+                    response_time 
+                )
+                return [] # Return empty list on JSON decode error
+
         except Exception as e:
             logger.error(
-                f"LLM attempt failed for video prompt using {model_used}: {str(e)}"
+                f"LLM call failed for video prompt generation using {model_used}: {str(e)}"
             )
-            # Provide a safe default prompt in case of error
-            result = f"A visual representation of {scenario.get('situation_description', 'an absurd crisis situation')}."
             # Log the error interaction
             await self.log_interaction(
                 turn_number,
-                "create_video_prompt_error",
+                "create_video_prompt_llm_error",
                 formatted_prompt,
-                f"Error: {str(e)}",
+                f"LLM Error: {str(e)}",
                 {},
                 model_used,
-                response_time  # Can still log time if failure happened after start
+                response_time # Can still log time if failure happened after start
             )
-
-        return result.strip()
+            return [] # Return empty list on LLM call failure
 
     def _parse_scenarios(self, result: str) -> List[str]:
         """
@@ -534,86 +594,78 @@ class LLMService:
         Parse JSON-formatted scenarios from the LLM result.
         
         Args:
-            result: The raw LLM result, expected to contain a JSON array
+            result: The raw LLM result, expected to contain a JSON array or single object
             current_turn_number: The current turn number to use in scenario IDs
             
         Returns:
-            List of scenario dictionaries
+            List of scenario dictionaries (even if a single object is parsed, it's wrapped in a list)
         """
-        logger.info("Parsing JSON scenarios from LLM result")
+        logger.info(f"Parsing JSON scenarios from LLM result (turn {current_turn_number})")
 
-        # First handle empty results
         if not result or not result.strip():
             logger.warning("Empty result received from LLM")
             return [self._create_default_scenario(current_turn_number, 1)]
 
-        # Find JSON content between triple backticks if present
-        import re
-        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', result)
-        json_str = json_match.group(1) if json_match else result
+        json_str = result.strip() # Initial strip
+        
+        # Try to find JSON content between triple backticks if present
+        # This regex handles optional 'json' language identifier and surrounding whitespace
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', json_str, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1).strip() # Strip again after extraction
+            logger.info(f"Extracted JSON from markdown: '{json_str[:100]}...'")
+        else:
+            # If no markdown backticks, assume the whole string (stripped) is the JSON content
+            # or contains it. Further cleaning might be needed below.
+            logger.info(f"No markdown backticks found, processing as raw string: '{json_str[:100]}...'")
 
-        # Try multiple parsing approaches
+        # Attempt to parse directly
         try:
-            # Try to parse as JSON directly
             data = json.loads(json_str)
-
-            # Handle both array and object formats
-            if isinstance(data, list):
-                logger.info(
-                    f"Successfully parsed JSON scenarios list (count: {len(data)})"
-                )
-                # Validate the scenarios have the expected format
+            if isinstance(data, dict): # Single scenario object (e.g. final conclusion)
+                logger.info("Successfully parsed as single JSON object.")
+                return [self._validate_scenario(data, current_turn_number, 1)]
+            elif isinstance(data, list): # List of scenarios
+                logger.info(f"Successfully parsed as JSON list (count: {len(data)})")
                 return self._validate_scenarios(data, current_turn_number)
-            elif isinstance(data, dict):
-                if "scenarios" in data:
-                    logger.info(
-                        f"Successfully parsed JSON scenarios from dict.scenarios (count: {len(data['scenarios'])})"
-                    )
-                    return self._validate_scenarios(data["scenarios"],
-                                                    current_turn_number)
-                else:
-                    # Single scenario
-                    logger.info("Successfully parsed single JSON scenario")
-                    return [
-                        self._validate_scenario(data, current_turn_number, 1)
-                    ]
+            else:
+                logger.warning(f"Parsed JSON is neither dict nor list, but {type(data)}.")
+                raise json.JSONDecodeError("Unsupported JSON structure", json_str, 0)
+
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON decode error: {str(e)}")
+            logger.warning(f"Initial JSON decode failed: {e}. Raw string for this attempt: '{json_str[:200]}...'")
+            # Fallback: try to extract the first valid JSON object if it seems embedded
+            # This is useful if there's leading/trailing non-JSON text not caught by regex
+            try:
+                # Find the first '{' and last '}'
+                start_brace = json_str.find('{')
+                end_brace = json_str.rfind('}')
+                if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+                    potential_json_object_str = json_str[start_brace : end_brace + 1]
+                    logger.info(f"Attempting to parse substring: '{potential_json_object_str[:100]}...'")
+                    data = json.loads(potential_json_object_str)
+                    if isinstance(data, dict): # Expected for final turn
+                        logger.info("Successfully parsed substring as single JSON object.")
+                        return [self._validate_scenario(data, current_turn_number, 1)]
+                    # Not typically expecting a list from this fallback, but handle if it occurs
+                    elif isinstance(data, list) and data:
+                         logger.info(f"Successfully parsed substring as JSON list (count: {len(data)}). Taking first element.")
+                         return [self._validate_scenario(data[0], current_turn_number, 1)] 
+                    else:
+                        logger.warning(f"Substring parsed to {type(data)}, not dict or non-empty list.")
+                        raise json.JSONDecodeError("Substring parse resulted in unexpected type", potential_json_object_str, 0)
+                else:
+                    logger.warning("Could not find valid start/end braces for JSON object extraction.")
+                    raise # Reraise the original JSONDecodeError
+            except json.JSONDecodeError as e2:
+                logger.error(f"Fallback JSON parsing also failed: {e2}. String for this attempt: '{potential_json_object_str if 'potential_json_object_str' in locals() else json_str[:200]}'")
+                # If all parsing fails, resort to a single default scenario
+                logger.warning("All JSON parsing attempts failed. Creating single default scenario.")
+                return [self._create_default_scenario(current_turn_number, 1)]
 
-            # Try another approach - look for json array pattern
-            pattern = r'\[\s*{.*?}\s*(?:,\s*{.*?}\s*)*\]'
-            json_arrays = re.findall(pattern, result, re.DOTALL)
-
-            if json_arrays:
-                for json_array in json_arrays:
-                    try:
-                        data = json.loads(json_array)
-                        if isinstance(data, list) and len(data) > 0:
-                            logger.info(
-                                f"Found JSON array in text (count: {len(data)})"
-                            )
-                            return self._validate_scenarios(
-                                data, current_turn_number)
-                    except:
-                        pass
-
-        # If JSON parsing fails, try a more lenient approach
-        logger.warning(
-            "Failed to parse JSON scenarios, falling back to manual parsing")
-        text_scenarios = self._parse_scenarios(result)
-
-        if not text_scenarios:
-            logger.warning(
-                "No scenarios found through text parsing, creating default")
-            return [self._create_default_scenario(current_turn_number, 1)]
-
-        # Map the parsed scenarios to the expected format
-        return [
-            self._create_default_scenario(current_turn_number,
-                                          i + 1,
-                                          description=s)
-            for i, s in enumerate(text_scenarios)
-        ]
+        # Should not be reached if parsing was successful or fell back correctly
+        logger.error("Reached end of _parse_json_scenarios without returning a valid scenario list. This indicates a logic flaw.")
+        return [self._create_default_scenario(current_turn_number, 1)]
 
     def _validate_scenarios(
             self,
@@ -663,28 +715,78 @@ class LLMService:
 
         situation = scenario.get("situation_description", "")
         rationale = scenario.get("rationale", "Auto-generated")
-        user_role = scenario.get(
-            "user_role",
-            "Crisis Response Specialist tasked with solving this absurd global threat"
-        )
-        user_prompt = scenario.get(
-            "user_prompt",
-            "What strategy will you implement to address this situation and save the world?"
-        )
-
+        
+        # Determine if this is the final turn (for streamlined conclusion structure)
+        is_final_turn = current_turn_number >= 5  # Assuming 5 is max_turns
+        
+        # For non-final turns, include user_role and user_prompt
+        user_role = None
+        user_prompt = None
+        if not is_final_turn:
+            user_role = scenario.get(
+                "user_role",
+                "Crisis Response Specialist tasked with solving this absurd global threat"
+            )
+            user_prompt = scenario.get(
+                "user_prompt",
+                "What strategy will you implement to address this situation and save the world?"
+            )
+        
+        # Extract grade and grade_explanation for final turns
+        # Default grade is 70 (passing) if not provided or invalid
+        grade = None
+        grade_explanation = None
+        
+        # Always set a grade for final turns
+        if is_final_turn:
+            try:
+                if "grade" in scenario:
+                    grade_value = int(scenario["grade"])
+                    if 1 <= grade_value <= 100:
+                        grade = grade_value
+                    else:
+                        logger.warning(f"Grade value out of range (1-100): {grade_value}. Setting default grade.")
+                        grade = 70
+                else:
+                    logger.warning("No grade provided for final turn. Setting default grade.")
+                    grade = 70
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid grade format: {scenario.get('grade')}. Setting default grade.")
+                grade = 70
+            
+            # Ensure grade explanation exists
+            grade_explanation = scenario.get("grade_explanation", "Performance was adequate but with room for improvement in addressing the absurd physics of the situation.")
+        
         # Check for empty or invalid values
         if not situation:
             logger.warning(f"Scenario {index} missing situation_description")
             situation = f"An absurd crisis has emerged requiring your immediate attention. The world is facing a bizarre threat that only you can address."
 
         # Return validated scenario
-        return {
+        result = {
             "id": id_value,
             "situation_description": situation,
-            "rationale": rationale,
-            "user_role": user_role,
-            "user_prompt": user_prompt
+            "rationale": rationale
         }
+        
+        # Add user_role and user_prompt for non-final turns
+        if not is_final_turn:
+            if user_role:
+                result["user_role"] = user_role
+            if user_prompt:
+                result["user_prompt"] = user_prompt
+        
+        # Add grade fields if they exist (typically for final turn)
+        if grade is not None:
+            result["grade"] = grade
+        if grade_explanation is not None:
+            result["grade_explanation"] = grade_explanation
+            
+        # Log the grade for final turns to help debug
+        if is_final_turn:
+            logger.info(f"Final turn scenario processed with grade: {grade} and explanation: {grade_explanation[:50]}...")
+            
+        return result
 
     def _create_default_scenario(self,
                                  current_turn_number: int,
@@ -725,3 +827,87 @@ class LLMService:
             The scenario dictionary or None if not found
         """
         return self.scenarios_dict.get(scenario_id)
+
+    async def generate_video_sequence_from_scenario(
+        self, 
+        scenario: Dict[str, str], 
+        turn_number: int = 1
+    ) -> List[str]:
+        """
+        Generates four video scene descriptions from a scenario, then generates a video for each
+        description in parallel, uploads them to Cloudflare (via HuggingFaceService),
+        and returns a list of their URLs.
+
+        Args:
+            scenario: The scenario dictionary with 'situation_description'.
+            turn_number: The current turn number for logging and filename generation.
+
+        Returns:
+            A list of four Cloudflare/public URLs for the generated videos in sequence.
+            Returns an empty list if scene generation fails, no HuggingFaceService is available,
+            or if any video generation/upload fails.
+        """
+        logger.info(f"Initiating video sequence generation for turn {turn_number}.")
+
+        if not self.huggingface_service:
+            logger.error(
+                "HuggingFaceService is not available in LLMService. Cannot generate videos."
+            )
+            return []
+
+        # Step 1: Get the four scene descriptions
+        scene_descriptions = await self.create_video_prompt(scenario, turn_number)
+
+        if not scene_descriptions or len(scene_descriptions) != 4:
+            logger.error(
+                f"Failed to obtain 4 scene descriptions. Received: {scene_descriptions}. Aborting video sequence generation."
+            )
+            return []
+        
+        logger.info(f"Successfully obtained {len(scene_descriptions)} scene descriptions.")
+
+        # Step 2: Parallel Video Generation and Upload for each scene
+        # HuggingFaceService's generate_video method already handles generation 
+        # and potential R2 upload, returning a URL.
+        video_generation_tasks = []
+        for i, description in enumerate(scene_descriptions):
+            # Pass turn_number to generate_video for consistent file naming and logging
+            # The HuggingFaceService.generate_video method is already async
+            task = self.huggingface_service.generate_video(prompt=description, turn=turn_number)
+            video_generation_tasks.append(task)
+            logger.info(f"Queued video generation for scene {i+1}: {description[:100]}...")
+
+        video_urls = []
+        try:
+            # asyncio.gather will run all tasks concurrently
+            logger.info(f"Executing {len(video_generation_tasks)} video generation tasks in parallel...")
+            results = await asyncio.gather(*video_generation_tasks, return_exceptions=True)
+            logger.info("All video generation tasks completed.")
+
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.error(f"Error generating video for scene {i+1} ('{scene_descriptions[i][:50]}...'): {result}")
+                    # If any video fails, we return an empty list as per current understanding
+                    # Potentially log details of the exception result
+                    # logger.error(traceback.format_exc(exception=result)) # If more detail needed
+                    return [] 
+                elif result is None:
+                    logger.error(f"Video generation for scene {i+1} ('{scene_descriptions[i][:50]}...') returned None URL.")
+                    return [] # If None URL, treat as failure
+                else:
+                    logger.info(f"Successfully generated video for scene {i+1}. URL: {result}")
+                    video_urls.append(result)
+            
+            if len(video_urls) == 4:
+                logger.info("Successfully generated and uploaded all 4 videos.")
+                return video_urls
+            else:
+                logger.error(
+                    f"Expected 4 video URLs, but got {len(video_urls)}. Details: {video_urls}"
+                )
+                return [] # Should not happen if all results were checked, but as a safeguard
+
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during parallel video generation: {str(e)}")
+            logger.error(traceback.format_exc())
+            return [] # Return empty list on general failure

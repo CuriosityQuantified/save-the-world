@@ -1,238 +1,578 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * MediaHandler component for displaying videos and audio with synchronized playback
+ * MediaHandler component for displaying a sequence of videos and a synchronized audio track.
  */
-const MediaHandler = ({ src, audioSrc, type = 'video/mp4', width = '100%', height = 'auto' }) => {
-  console.log('MediaHandler props:', { src, audioSrc, type, width, height });
+const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%', height = 'auto' }) => {
+  console.log('MediaHandler props:', { video_urls, audio_url, type, width, height });
 
   const [error, setError] = useState(false);
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [audioUrl, setAudioUrl] = useState('');
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [activeVideoUrl, setActiveVideoUrl] = useState('');
+  const [activeAudioUrl, setActiveAudioUrl] = useState('');
+
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-  const [audioReady, setAudioReady] = useState(false);
-  const videoRef = useRef(null);
+  const [allMediaReady, setAllMediaReady] = useState(false); 
+  const [currentVideoReady, setCurrentVideoReady] = useState(false);
+  const [nextVideoReady, setNextVideoReady] = useState(false);
+  const [audioElementReady, setAudioElementReady] = useState(false);
+  
+  // Loading progress states
+  const [videosLoading, setVideosLoading] = useState(0);
+  const [videosTotal, setVideosTotal] = useState(0);
+  const [showLoadingProgress, setShowLoadingProgress] = useState(true);
+
+  // Using two video elements for seamless playback (one plays while the other preloads)
+  const primaryVideoRef = useRef(null);
+  const bufferVideoRef = useRef(null);
   const audioRef = useRef(null);
+
+  // Track which ref is currently active (primary or buffer)
+  const [activeVideoRef, setActiveVideoRef] = useState('primary');
+  const activeRef = activeVideoRef === 'primary' ? primaryVideoRef : bufferVideoRef;
+  const inactiveRef = activeVideoRef === 'primary' ? bufferVideoRef : primaryVideoRef;
+
+  const validVideoUrls = useRef([]);
   
   useEffect(() => {
-    // Format the URL correctly, ensuring it doesn't have duplicate slashes
-    let formattedSrc = src;
-    if (src && !src.startsWith('http')) {
-      // Remove any leading slash and ensure it starts with /
-      formattedSrc = '/' + src.replace(/^\/+/, '');
+    // Filter out null or empty URLs and prepare the playlist
+    const playlist = [];
+    if (Array.isArray(video_urls)) {
+      video_urls.forEach(url => {
+        if (url && typeof url === 'string') {
+          const formattedUrl = url.startsWith('http') ? url : '/' + url.replace(/^\/+/, '');
+          playlist.push(formattedUrl); // Each video plays once
+        }
+      });
     }
-    setMediaUrl(formattedSrc);
-    setVideoReady(false); // Reset ready state when source changes
+    validVideoUrls.current = playlist;
+    console.log("Processed video playlist:", validVideoUrls.current);
     
-    // Format the audio URL if provided
-    if (audioSrc) {
-      let formattedAudioSrc = audioSrc;
-      if (audioSrc && !audioSrc.startsWith('http')) {
-        formattedAudioSrc = '/' + audioSrc.replace(/^\/+/, '');
-      }
-      setAudioUrl(formattedAudioSrc);
-      console.log(`Setting audio URL to: ${formattedAudioSrc}`);
-      setAudioReady(false); // Reset ready state when source changes
-    } else {
-      console.log('No audio source provided');
-      setAudioReady(true); // No audio means audio is "ready"
-    }
-  }, [src, audioSrc]);
+    // Set total videos count for loading progress
+    setVideosTotal(playlist.length);
+    setVideosLoading(0);
+    setShowLoadingProgress(true);
 
-  // Set up event listeners for readiness tracking
-  useEffect(() => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
+    setCurrentVideoIndex(0);
+    setActiveVideoUrl(validVideoUrls.current.length > 0 ? validVideoUrls.current[0] : '');
+    setCurrentVideoReady(false);
+    setNextVideoReady(false);
+    setAllMediaReady(false);
     
-    if (!video) return;
+    // Format and set the audio URL
+    if (audio_url && typeof audio_url === 'string') {
+      const formattedAudio = audio_url.startsWith('http') ? audio_url : '/' + audio_url.replace(/^\/+/, '');
+      setActiveAudioUrl(formattedAudio);
+      console.log(`Setting audio URL to: ${formattedAudio}`);
+      setAudioElementReady(false);
+    } else {
+      console.log('No audio source provided or invalid format');
+      setActiveAudioUrl('');
+      setAudioElementReady(true);
+    }
+    
+    // Reset to primary video ref when playlist changes
+    setActiveVideoRef('primary');
+  }, [video_urls, audio_url]);
+
+  // Load the current video in the active player
+  useEffect(() => {
+    const video = activeRef.current;
+    if (!video || !activeVideoUrl) {
+      setCurrentVideoReady(validVideoUrls.current.length === 0);
+      return;
+    }
+    
+    console.log(`Loading current video in ${activeVideoRef} player: ${activeVideoUrl}`);
+    video.src = activeVideoUrl;
+    video.load();
     
     const handleVideoCanPlay = () => {
-      console.log('Video can play');
-      setVideoReady(true);
+      console.log(`Current video ${activeVideoUrl} can play`);
+      setCurrentVideoReady(true);
+      setVideosLoading(prev => prev + 1);
+      setError(false);
     };
     
     const handleVideoError = (e) => {
-      console.error('Video error:', e);
-      setVideoReady(false);
+      console.error(`Video error for ${activeVideoUrl}:`, e);
+      setCurrentVideoReady(false);
+      setVideosLoading(prev => prev + 1); // Still count as processed
       setError(true);
+      // Attempt to play next video if this one fails
+      handleVideoEnded(); 
     };
-    
-    // Add event listeners
+
     video.addEventListener('canplay', handleVideoCanPlay);
     video.addEventListener('error', handleVideoError);
     
-    // Clean up event listeners
     return () => {
       video.removeEventListener('canplay', handleVideoCanPlay);
       video.removeEventListener('error', handleVideoError);
     };
-  }, [mediaUrl]);
+  }, [activeVideoUrl, activeVideoRef]);
   
-  // Set up event listeners for audio readiness
+  // Preload the next video in the inactive player
   useEffect(() => {
-    const audio = audioRef.current;
-    
-    if (!audio || !audioUrl) {
-      // If no audio element or no audio URL, consider audio as ready
-      console.log('No audio element or URL - marking audio as ready');
-      setAudioReady(true);
+    // Only preload if we have more than one video
+    if (validVideoUrls.current.length <= 1) {
+      setNextVideoReady(true);
       return;
     }
     
-    console.log(`Setting up audio element with source: ${audioUrl}`);
+    const nextVideoIndex = (currentVideoIndex + 1) % validVideoUrls.current.length;
+    const nextVideoUrl = validVideoUrls.current[nextVideoIndex];
+    const bufferVideo = inactiveRef.current;
+    
+    if (!bufferVideo || !nextVideoUrl) {
+      return;
+    }
+    
+    console.log(`Preloading next video in ${activeVideoRef === 'primary' ? 'buffer' : 'primary'} player: ${nextVideoUrl}`);
+    bufferVideo.src = nextVideoUrl;
+    bufferVideo.load();
+    
+    const handleBufferCanPlay = () => {
+      console.log(`Next video ${nextVideoUrl} is ready in buffer`);
+      setNextVideoReady(true);
+    };
+    
+    const handleBufferError = (e) => {
+      console.error(`Error preloading next video ${nextVideoUrl}:`, e);
+      setNextVideoReady(false);
+    };
+    
+    bufferVideo.addEventListener('canplay', handleBufferCanPlay);
+    bufferVideo.addEventListener('error', handleBufferError);
+    
+    return () => {
+      bufferVideo.removeEventListener('canplay', handleBufferCanPlay);
+      bufferVideo.removeEventListener('error', handleBufferError);
+    };
+  }, [currentVideoIndex, activeVideoRef, validVideoUrls.current.length]);
+  
+  // Effect to handle loading of the audio element
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !activeAudioUrl) {
+      setAudioElementReady(true);
+      return;
+    }
+    
+    console.log(`Setting up audio element with source: ${activeAudioUrl}`);
+    audio.src = activeAudioUrl;
+    audio.load();
     
     const handleAudioCanPlay = () => {
       console.log('Audio can play');
-      setAudioReady(true);
+      setAudioElementReady(true);
     };
     
     const handleAudioError = (e) => {
-      console.error('Audio error:', e);
-      console.error(`Failed to load audio from ${audioUrl}`);
-      setAudioReady(false);
-      // Don't set the overall error state, we can still play video without audio
+      console.error('Audio error:', e, `URL: ${activeAudioUrl}`);
+      setAudioElementReady(true);
     };
-    
-    // Add event listeners
-    audio.addEventListener('canplay', handleAudioCanPlay);
+
+    audio.addEventListener('canplaythrough', handleAudioCanPlay);
     audio.addEventListener('error', handleAudioError);
     
-    // Clean up event listeners
     return () => {
-      audio.removeEventListener('canplay', handleAudioCanPlay);
+      audio.removeEventListener('canplaythrough', handleAudioCanPlay);
       audio.removeEventListener('error', handleAudioError);
     };
-  }, [audioUrl]);
+  }, [activeAudioUrl]);
   
-  // Update overall ready state when both audio and video are ready
+  // Update overall media readiness
   useEffect(() => {
-    setIsReady(videoReady && audioReady);
-  }, [videoReady, audioReady]);
-
-  // Set up synchronization between video and audio elements
-  useEffect(() => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
-    
-    if (!video || !audio || !audioUrl) return;
-    
-    const handlePlay = () => {
-      audio.currentTime = video.currentTime;
-      audio.play().catch(e => console.error('Error playing audio:', e));
-      setIsPlaying(true);
-    };
-    
-    const handlePause = () => {
-      audio.pause();
-      setIsPlaying(false);
-    };
-    
-    const handleEnded = () => {
-      setIsPlaying(false);
-    };
-    
-    const handleSeeked = () => {
-      audio.currentTime = video.currentTime;
-    };
-    
-    // Add event listeners
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('seeked', handleSeeked);
-    video.addEventListener('ended', handleEnded);
-    
-    // Clean up event listeners
-    return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('seeked', handleSeeked);
-      video.removeEventListener('ended', handleEnded);
-    };
-  }, [audioUrl]);
-
-  const handlePlayPause = () => {
-    const video = videoRef.current;
-    const audio = audioRef.current;
-    
-    if (!video) return;
-    
-    if (isPlaying) {
-      console.log('Pausing media');
-      video.pause();
+    if (validVideoUrls.current.length === 0) {
+        setAllMediaReady(true);
+        // Don't hide progress immediately, leave it visible for a moment
+        setTimeout(() => setShowLoadingProgress(false), 1000);
     } else {
-      console.log('Attempting to play media');
-      if (audio) {
-        console.log('Audio element exists, attempting to play synchronized');
-      }
-      
-      video.play().catch(e => {
+        setAllMediaReady(currentVideoReady && audioElementReady);
+        if (currentVideoReady && audioElementReady) {
+          // Hide loading progress after a longer delay to ensure user sees completion
+          setTimeout(() => setShowLoadingProgress(false), 1500);
+        }
+    }
+  }, [currentVideoReady, audioElementReady, validVideoUrls.current.length]);
+
+  // Auto-play when media is ready
+  useEffect(() => {
+    if (allMediaReady && activeRef.current && validVideoUrls.current.length > 0) {
+      console.log("All media ready, attempting to play current video and sync audio.");
+      playCurrentMedia();
+    }
+  }, [allMediaReady, activeVideoUrl]);
+
+  const playCurrentMedia = () => {
+    const video = activeRef.current;
+    const audio = audioRef.current;
+    
+    if (video) {
+      video.play().then(() => {
+        setIsPlaying(true);
+        if (audio && activeAudioUrl && audio.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+          if (currentVideoIndex === 0) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.error('Error playing audio:', e));
+          } else if (audio.paused && activeAudioUrl) {
+             audio.play().catch(e => console.error('Error resuming audio:', e));
+          }
+        }
+      }).catch(e => {
         console.error('Error playing video:', e);
         setError(true);
+        handleVideoEnded();
       });
     }
   };
 
-  if (error) {
+  // Handler for when a video finishes playing - swap to the preloaded buffer video
+  const handleVideoEnded = () => {
+    console.log(`Video ${activeVideoUrl} ended. Current index: ${currentVideoIndex}`);
+    setIsPlaying(false);
+    
+    // Check if next video is ready in buffer
+    if (!nextVideoReady) {
+      console.log("Next video not ready yet, waiting...");
+      // Wait a short time and try again
+      setTimeout(handleVideoEnded, 20);
+      return;
+    }
+    
+    // Swap the video refs (primary <-> buffer)
+    setActiveVideoRef(prev => prev === 'primary' ? 'buffer' : 'primary');
+    
+    // Update the currentVideoIndex for the next video
+    const nextVideoIndex = (currentVideoIndex + 1) % validVideoUrls.current.length;
+    setCurrentVideoIndex(nextVideoIndex);
+    setActiveVideoUrl(validVideoUrls.current[nextVideoIndex]);
+    
+    // Reset readiness states for the swap
+    setCurrentVideoReady(nextVideoReady); // The buffer video is now current
+    setNextVideoReady(false);         // Need to load the next buffer video
+  };
+
+  // Video ended event handlers for both players
+  useEffect(() => {
+    const primaryVideo = primaryVideoRef.current;
+    const bufferVideo = bufferVideoRef.current;
+    
+    if (!primaryVideo || !bufferVideo) return;
+    
+    const handlePrimaryEnded = () => {
+      if (activeVideoRef === 'primary') {
+        handleVideoEnded();
+      }
+    };
+    
+    const handleBufferEnded = () => {
+      if (activeVideoRef === 'buffer') {
+        handleVideoEnded();
+      }
+    };
+    
+    primaryVideo.addEventListener('ended', handlePrimaryEnded);
+    bufferVideo.addEventListener('ended', handleBufferEnded);
+    
+    return () => {
+      primaryVideo.removeEventListener('ended', handlePrimaryEnded);
+      bufferVideo.removeEventListener('ended', handleBufferEnded);
+    };
+  }, [activeVideoRef, currentVideoIndex, nextVideoReady]);
+
+  // Play/pause synchronization between video and audio
+  useEffect(() => {
+    const primaryVideo = primaryVideoRef.current;
+    const bufferVideo = bufferVideoRef.current;
+    const audio = audioRef.current;
+    
+    if (!primaryVideo || !bufferVideo || !audio) return;
+    
+    const syncPlay = (videoElement) => {
+      if (audio.src && !audio.paused && videoElement.paused) {
+        videoElement.play().catch(e => console.log('Error syncing video play:', e));
+      }
+    };
+    
+    const syncPause = (videoElement) => {
+      if (audio.src && !videoElement.paused && audio.paused) {
+        videoElement.pause();
+      } else if (audio.src && !audio.paused && videoElement.paused) {
+        videoElement.play().catch(e => console.log('Error resuming video on audio play:', e));
+      }
+    };
+    
+    const handleAudioPlay = () => {
+      syncPlay(activeVideoRef === 'primary' ? primaryVideo : bufferVideo);
+    };
+    
+    const handleAudioPause = () => {
+      syncPause(activeVideoRef === 'primary' ? primaryVideo : bufferVideo);
+    };
+    
+    audio.addEventListener('play', handleAudioPlay);
+    audio.addEventListener('pause', handleAudioPause);
+    
+    return () => {
+      audio.removeEventListener('play', handleAudioPlay);
+      audio.removeEventListener('pause', handleAudioPause);
+    };
+  }, [activeVideoRef]);
+
+  // When audio ends, pause the video but keep it visible
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const handleAudioEnd = () => {
+      // When audio ends, pause both videos but keep them visible
+      if (primaryVideoRef.current && !primaryVideoRef.current.paused) {
+        primaryVideoRef.current.pause();
+      }
+      if (bufferVideoRef.current && !bufferVideoRef.current.paused) {
+        bufferVideoRef.current.pause();
+      }
+      setIsPlaying(false);
+    };
+    
+    audio.addEventListener('ended', handleAudioEnd);
+    
+    return () => {
+      audio.removeEventListener('ended', handleAudioEnd);
+    };
+  }, []);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      if (primaryVideoRef.current) {
+        primaryVideoRef.current.pause();
+        primaryVideoRef.current.src = '';
+      }
+      if (bufferVideoRef.current) {
+        bufferVideoRef.current.pause();
+        bufferVideoRef.current.src = '';
+      }
+    };
+  }, []);
+
+  // Render a progress indicator with checkmark and animation
+  const ProgressItem = ({ label, isComplete }) => (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "12px",
+      color: isComplete ? "#00ff00" : "#aaa",
+      transition: "color 0.5s ease",
+      fontSize: "0.9em",
+      padding: "5px",
+      borderRadius: "4px",
+      backgroundColor: isComplete ? "rgba(0, 85, 0, 0.2)" : "transparent",
+      transition: "background-color 0.5s ease, color 0.5s ease",
+    }}>
+      <span style={{
+        display: "inline-flex",
+        justifyContent: "center",
+        alignItems: "center",
+        width: "24px",
+        height: "24px",
+        borderRadius: "12px",
+        backgroundColor: isComplete ? "#005500" : "#333",
+        marginRight: "15px",
+        transition: "background-color 0.5s ease",
+        animation: isComplete ? "checkmarkPop 0.5s ease-in-out" : "none",
+        fontWeight: "bold",
+        fontSize: "16px",
+      }}>
+        {isComplete ? "✓" : "..."}
+      </span>
+      <span style={{ flex: 1 }}>{label}</span>
+      <span style={{
+        marginLeft: "10px",
+        fontWeight: isComplete ? "bold" : "normal",
+        color: isComplete ? "#00ff00" : "#888",
+        transition: "color 0.5s ease",
+        fontSize: "0.8em",
+      }}>
+        {isComplete ? "Complete" : "Pending"}
+      </span>
+    </div>
+  );
+
+  if (error && validVideoUrls.current.length > 0 && currentVideoIndex >= validVideoUrls.current.length - 1) {
     return (
       <div className="media-error">
         <p>Unable to load media. Please try again later.</p>
-        <small>{mediaUrl}</small>
+        {activeVideoUrl && <small>Failed on: {activeVideoUrl}</small>}
       </div>
     );
+  }
+  
+  if (validVideoUrls.current.length === 0 && !activeAudioUrl) {
+      return (
+        <div className="media-loading">
+            <p>No media to display.</p>
+        </div>
+      )
   }
 
   return (
     <div className="media-container">
-      {/* Loading Indicator */}
-      {!isReady && !error && (
-        <div className="media-loading">
-          <p>Loading media...</p>
+      {showLoadingProgress && !error && (
+        <div className="media-loading-overlay" style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          boxSizing: 'border-box',
+          animation: 'fadeIn 0.3s ease-in-out',
+        }}>
+          <h3 style={{ 
+            color: '#00ff00', 
+            marginBottom: '20px', 
+            textAlign: 'center',
+            textShadow: '0 0 10px rgba(0, 255, 0, 0.5)',
+            fontSize: '1.2em',
+          }}>
+            Loading Media Assets
+          </h3>
+          
+          <div style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: '20px',
+            borderRadius: '8px',
+            width: '80%',
+            maxWidth: '400px',
+          }}>
+            <ProgressItem 
+              label={`Video Files (${videosLoading}/${videosTotal})`} 
+              isComplete={videosLoading >= videosTotal} 
+            />
+            
+            <ProgressItem 
+              label={`Audio Track`} 
+              isComplete={audioElementReady} 
+            />
+            
+            {videosTotal > 0 && (
+              <div style={{ width: '100%', marginTop: '20px' }}>
+                <div style={{ 
+                  backgroundColor: '#333', 
+                  height: '10px',
+                  borderRadius: '5px',
+                  overflow: 'hidden',
+                  marginTop: '5px',
+                  border: '1px solid #444',
+                }}>
+                  <div style={{ 
+                    width: `${(videosLoading / videosTotal) * 100}%`, 
+                    height: '100%', 
+                    backgroundColor: '#00aa00',
+                    transition: 'width 0.5s ease',
+                    backgroundImage: 'linear-gradient(to right, #008800, #00dd00)',
+                    boxShadow: '0 0 5px rgba(0, 255, 0, 0.5)',
+                  }}></div>
+                </div>
+                <div style={{ 
+                  textAlign: 'center', 
+                  marginTop: '8px', 
+                  fontSize: '0.9em',
+                  color: '#aaa',
+                  fontWeight: videosLoading === videosTotal ? 'bold' : 'normal',
+                  color: videosLoading === videosTotal ? '#00ff00' : '#aaa',
+                }}>
+                  {Math.round((videosLoading / videosTotal) * 100)}% complete
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       
-      {/* Custom controls wrapper - positioned relatively for overlay if needed */}
-      <div className="media-player" style={{ position: 'relative' }}>
+      <div className="media-player" style={{ position: 'relative', width, height, backgroundColor: '#000' }}>
+        {/* Primary video element */}
         <video 
-          ref={videoRef}
-          width={width}
-          height={height}
+          ref={primaryVideoRef}
+          width="100%" 
+          height="100%"
           controls={false}
-          onError={() => setError(true)}
-          style={{ display: isReady ? 'block' : 'none' }}
+          style={{ 
+            display: activeVideoRef === 'primary' ? 'block' : 'none', 
+            objectFit: 'contain' 
+          }}
         >
-          <source src={mediaUrl} type={type} />
           Your browser does not support the video tag.
         </video>
 
-        {/* Audio element - hidden */}
-        {audioUrl && (
-          <audio ref={audioRef} src={audioUrl} preload="auto" />
+        {/* Buffer video element */}
+        <video 
+          ref={bufferVideoRef}
+          width="100%" 
+          height="100%"
+          controls={false}
+          style={{ 
+            display: activeVideoRef === 'buffer' ? 'block' : 'none', 
+            objectFit: 'contain' 
+          }}
+        >
+          Your browser does not support the video tag.
+        </video>
+
+        {/* Audio element - always present for potential playback, but hidden */}
+        {activeAudioUrl && (
+          <audio ref={audioRef} preload="auto" loop={false} />
         )}
       </div>
       
       <style jsx>{`
+        .media-container {
+          width: ${width};
+          height: ${height};
+          position: relative;
+        }
         video::-webkit-media-controls {
           display: none !important;
         }
         video::-moz-media-controls {
           display: none !important;
         }
+        .media-loading, .media-error {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 100%;
+          height: 100%;
+          background-color: #111;
+          color: #666;
+          text-align: center;
+        }
+        .media-error p { color: #ff6666; }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes checkmarkPop {
+          0% { transform: scale(0.5); opacity: 0.5; }
+          70% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
       `}</style>
-      
-      {/* Debug info (optional) */}
-      {/* 
-      <div style={{ marginTop: '10px', fontSize: '0.8em' }}>
-        <p>Video Ready: {videoReady.toString()}</p>
-        <p>Audio Ready: {audioReady.toString()}</p>
-        <p>Overall Ready: {isReady.toString()}</p>
-        <p>Is Playing: {isPlaying.toString()}</p>
-        <p>Video URL: {mediaUrl || 'N/A'}</p>
-        <p>Audio URL: {audioUrl || 'N/A'}</p>
-        <p>Error: {error.toString()}</p>
-      </div>
-      */}
     </div>
   );
 };

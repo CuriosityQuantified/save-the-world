@@ -27,6 +27,8 @@ class Scenario(BaseModel):
     rationale: str
     user_role: Optional[str] = ""
     user_prompt: Optional[str] = ""
+    grade: Optional[int] = None
+    grade_explanation: Optional[str] = None
 
 class UserResponse(BaseModel):
     """Model representing a user's response to a scenario."""
@@ -42,7 +44,7 @@ class SimulationTurn(BaseModel):
     user_response: Optional[UserResponse] = None
     video_prompt: Optional[str] = None
     narration_script: Optional[str] = None
-    video_url: Optional[str] = None
+    video_urls: Optional[List[str]] = None
     audio_url: Optional[str] = None
     llm_logs: List[LLMLog] = []  # New field to store LLM logs for this turn
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -51,7 +53,7 @@ class SimulationState(BaseModel):
     """Model representing the complete state of a simulation."""
     simulation_id: str = Field(default_factory=lambda: f"sim_{datetime.now().strftime('%Y%m%d%H%M%S')}")
     current_turn_number: int = 1
-    max_turns: int = 6
+    max_turns: int = 5
     turns: List[SimulationTurn] = []
     is_complete: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
@@ -185,19 +187,19 @@ class SimulationState(BaseModel):
             turn.narration_script = narration_script
             self.updated_at = datetime.now()
     
-    def add_media_urls(self, turn_number: int, video_url: Optional[str] = None, audio_url: Optional[str] = None) -> None:
+    def add_media_urls(self, turn_number: int, video_urls: Optional[List[str]] = None, audio_url: Optional[str] = None) -> None:
         """
         Adds media URLs to the specified turn.
         
         Args:
             turn_number: The turn number to add URLs to
-            video_url: The URL of the generated video
+            video_urls: The URLs of the generated videos
             audio_url: The URL of the generated audio
         """
         turn = next((t for t in self.turns if t.turn_number == turn_number), None)
         if turn:
-            if video_url:
-                turn.video_url = video_url
+            if video_urls:
+                turn.video_urls = video_urls
             if audio_url:
                 turn.audio_url = audio_url
             self.updated_at = datetime.now()

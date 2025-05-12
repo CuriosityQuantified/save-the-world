@@ -236,7 +236,11 @@ class MediaService:
         user_prompt = scenario.get('user_prompt', '')
 
         # Create a concise script that combines these elements
-        script = f"{situation} {user_prompt}"
+        # Include user_role only if it's available and this is the first turn
+        if turn == 1 and user_role:
+            script = f"{situation} {user_role} {user_prompt}"
+        else:
+            script = f"{situation} {user_prompt}"
 
         logger.info(f"Generating audio for scenario with Groq TTS")
         logger.info(f"Script: {script[:100]}...")
@@ -311,99 +315,116 @@ class MediaService:
     async def generate_media_parallel(
             self,
             scenario: Dict[str, str],
-            video_prompt: str,
-            turn: int = 1) -> Dict[str, Optional[str]]:
+            video_prompt: Union[str, List[str]],
+            turn: int = 1) -> Dict[str, Optional[Union[List[Optional[str]], str]]]:
         """
-        Generate video and audio in parallel for maximum efficiency.
+        Generate video(s) and audio in parallel for maximum efficiency.
+        If video_prompt is a list, multiple videos are generated.
 
         Args:
             scenario: The scenario dictionary for audio generation
-            video_prompt: The prompt for video generation
+            video_prompt: A single prompt string or a list of prompt strings for video generation
             turn: The current turn number
 
         Returns:
-            Dictionary containing 'video_url' and 'audio_url'
+            Dictionary containing 'video_urls' (List of URLs or None) and 'audio_url' (URL or None)
         """
         logger.info(
-            f"Starting TRUE parallel generation of video and audio for turn {turn}"
+            f"Starting parallel generation of media for turn {turn}. Video prompt type: {type(video_prompt)}"
         )
         start_time = time.time()
 
-        # No need to manage the loop explicitly here, asyncio handles it
-        # try:
-        #     loop = asyncio.get_event_loop()
-        # except RuntimeError:
-        #     loop = asyncio.new_event_loop()
-        #     asyncio.set_event_loop(loop)
-
         try:
-            # Create the coroutines
+            video_coroutines = []
+            if isinstance(video_prompt, list):
+                logger.info(f"Received {len(video_prompt)} video prompts. Creating multiple video coroutines.")
+                for i, single_prompt in enumerate(video_prompt):
+                    if isinstance(single_prompt, str):
+                        # Append a unique identifier to the turn for filename uniqueness if desired,
+                        # or let HuggingFaceService handle it. For now, just pass the turn.
+                        video_coroutines.append(self.generate_video(single_prompt, turn=turn)) # Potentially add scene_index=i if generate_video is adapted
+                    else:
+                        logger.warning(f"Item at index {i} in video_prompt list is not a string: {type(single_prompt)}. Skipping.")
+            elif isinstance(video_prompt, str):
+                logger.info("Received a single video prompt. Creating one video coroutine.")
+                video_coroutines.append(self.generate_video(video_prompt, turn=turn))
+            else:
+                logger.error(f"Invalid video_prompt type: {type(video_prompt)}. Expected str or list of str.")
+                return {'video_urls': None, 'audio_url': None} # Or handle error appropriately
+
+            if not video_coroutines:
+                logger.warning("No valid video coroutines created. Proceeding with audio only.")
+                # Fallthrough to let audio generate, video_urls will be None or empty
+
             logger.info(
-                f"[{time.time():.2f}] Creating video and audio coroutines...")
-            video_coro = self.generate_video(video_prompt, turn=turn)
+                f"[{time.time():.2f}] Creating audio coroutine...")
             audio_coro = self.generate_audio(scenario, turn=turn)
 
-            # Schedule both coroutines to run concurrently using asyncio.gather
+            # Combine video and audio tasks for asyncio.gather
+            # Video tasks are at the beginning of the 'all_tasks' list
+            all_tasks = video_coroutines + [audio_coro]
+
             logger.info(
-                f"[{time.time():.2f}] Calling asyncio.gather for video and audio tasks..."
+                f"[{time.time():.2f}] Calling asyncio.gather for {len(video_coroutines)} video task(s) and 1 audio task..."
             )
-            results = await asyncio.gather(
-                video_coro,
-                audio_coro,
-                return_exceptions=
-                True  # Capture exceptions instead of raising immediately
-            )
+            results = await asyncio.gather(*all_tasks, return_exceptions=True)
             logger.info(f"[{time.time():.2f}] asyncio.gather completed.")
 
-            video_url = None
-            audio_url = None
+            video_urls_list: List[Optional[str]] = []
+            num_video_tasks = len(video_coroutines)
 
-            # Process video result
-            logger.info(f"[{time.time():.2f}] Processing video result...")
-            if isinstance(results[0], Exception):
-                logger.error(
-                    f"Video generation task failed with exception: {results[0]}"
-                )
-                # Log the full traceback if available
-                tb_str = ''.join(
-                    traceback.format_exception(etype=type(results[0]),
-                                               value=results[0],
-                                               tb=results[0].__traceback__))
-                logger.error(f"Video generation traceback:\n{tb_str}")
-            elif results[0] is None:
-                logger.warning(f"Video generation task returned None.")
-            else:
-                video_url = results[0]
-                logger.info(
-                    f"[{time.time():.2f}] Video generation task finished successfully: {video_url}"
-                )
+            # Process video results
+            logger.info(f"[{time.time():.2f}] Processing {num_video_tasks} video result(s)...")
+            for i in range(num_video_tasks):
+                video_result = results[i]
+                current_prompt_snippet = video_prompt[i][:50] if isinstance(video_prompt, list) and i < len(video_prompt) else (video_prompt[:50] if isinstance(video_prompt, str) else "N/A")
+                if isinstance(video_result, Exception):
+                    logger.error(
+                        f"Video generation task {i+1} (prompt: '{current_prompt_snippet}...') failed with exception: {video_result}"
+                    )
+                    tb_str = ''.join(
+                        traceback.format_exception(etype=type(video_result),
+                                                   value=video_result,
+                                                   tb=video_result.__traceback__))
+                    logger.error(f"Video generation task {i+1} traceback:\\n{tb_str}")
+                    video_urls_list.append(None)
+                elif video_result is None:
+                    logger.warning(f"Video generation task {i+1} (prompt: '{current_prompt_snippet}...') returned None.")
+                    video_urls_list.append(None)
+                else:
+                    video_urls_list.append(video_result)
+                    logger.info(
+                        f"[{time.time():.2f}] Video generation task {i+1} (prompt: '{current_prompt_snippet}...') finished successfully: {video_result}"
+                    )
+            
+            # Process audio result (it's the last one in the results list)
+            audio_url: Optional[str] = None
+            audio_result = results[num_video_tasks] # Audio result is after all video results
 
-            # Process audio result
             logger.info(f"[{time.time():.2f}] Processing audio result...")
-            if isinstance(results[1], Exception):
+            if isinstance(audio_result, Exception):
                 logger.error(
-                    f"Audio generation task failed with exception: {results[1]}"
+                    f"Audio generation task failed with exception: {audio_result}"
                 )
-                # Log the full traceback if available
                 tb_str = ''.join(
-                    traceback.format_exception(etype=type(results[1]),
-                                               value=results[1],
-                                               tb=results[1].__traceback__))
-                logger.error(f"Audio generation traceback:\n{tb_str}")
-            elif results[1] is None:
+                    traceback.format_exception(etype=type(audio_result),
+                                               value=audio_result,
+                                               tb=audio_result.__traceback__))
+                logger.error(f"Audio generation traceback:\\n{tb_str}")
+            elif audio_result is None:
                 logger.warning(f"Audio generation task returned None.")
             else:
-                audio_url = results[1]
+                audio_url = audio_result
                 logger.info(
                     f"[{time.time():.2f}] Audio generation task finished successfully: {audio_url}"
                 )
 
             end_time = time.time()
             logger.info(
-                f"Parallel media generation for turn {turn} completed in {end_time - start_time:.2f} seconds. Video: {video_url}, Audio: {audio_url}"
+                f"Parallel media generation for turn {turn} completed in {end_time - start_time:.2f} seconds. Videos: {video_urls_list}, Audio: {audio_url}"
             )
 
-            return {'video_url': video_url, 'audio_url': audio_url}
+            return {'video_urls': video_urls_list, 'audio_url': audio_url}
 
         except Exception as e:
             # Catch any unexpected error during the parallel execution setup or processing
@@ -411,7 +432,7 @@ class MediaService:
                 f"Error occurred within generate_media_parallel itself: {str(e)}"
             )
             logger.error(traceback.format_exc())
-            return {'video_url': None, 'audio_url': None}
+            return {'video_urls': None, 'audio_url': None}
 
     def get_r2_config(self) -> Dict[str, Any]:
         """

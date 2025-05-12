@@ -146,7 +146,7 @@ class SimulationService:
                 media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=1)
                 
                 # Add media URLs to the simulation state
-                simulation.add_media_urls(1, media_results['video_url'], media_results['audio_url'])
+                simulation.add_media_urls(1, media_results['video_urls'], media_results['audio_url'])
             except Exception as e:
                 logger.error(f"Error processing scenario: {str(e)}")
                 raise
@@ -253,7 +253,7 @@ class SimulationService:
                 media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=next_turn)
                 
                 # Add media URLs to the simulation state
-                simulation.add_media_urls(next_turn, media_results['video_url'], media_results['audio_url'])
+                simulation.add_media_urls(next_turn, media_results['video_urls'], media_results['audio_url'])
                 
                 # Check if the simulation is now complete (final turn)
                 simulation.is_complete = (next_turn == simulation.max_turns)
@@ -277,7 +277,7 @@ class SimulationService:
                 video_url = "https://example.com/fallback_video.mp4"
                 audio_url = "https://example.com/fallback_audio.mp3"
                 simulation.add_media_prompts(next_turn, "Fallback video prompt", None)
-                simulation.add_media_urls(next_turn, video_url, audio_url)
+                simulation.add_media_urls(next_turn, [video_url], audio_url)
             
             # Update the simulation in the state service
             self.state_service.update_simulation(simulation)

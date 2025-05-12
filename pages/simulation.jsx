@@ -3,45 +3,97 @@ import Head from "next/head";
 import MediaHandler from "../components/MediaHandler";
 
 export default function SimulationPage({ initialScenario }) {
-  const [scenario, setScenario] = useState(
-    initialScenario || {
-      situation_description: "Loading situation...",
-      video_url: null,
-      audio_url: null,
-    },
+  const [scenarioText, setScenarioText] = useState(
+    initialScenario?.situation_description || "Loading situation...",
   );
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turn, setTurn] = useState(0);
-  const [MAX_TURNS, setMAX_TURNS] = useState(10);
+  const [MAX_TURNS, setMAX_TURNS] = useState(5);
   const [userInput, setUserInput] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [narrationUrl, setNarrationUrl] = useState("");
+  
+  // State for media URLs received from the backend
+  const [currentVideoUrls, setCurrentVideoUrls] = useState([]);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
+
+  // New generation progress states
+  const [scenarioGenerated, setScenarioGenerated] = useState(false);
+  const [videosGenerated, setVideosGenerated] = useState(false);
+  const [audioGenerated, setAudioGenerated] = useState(false);
+
   const [history, setHistory] = useState([]);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
+  const wsRef = useRef(null); // Ref to hold the WebSocket connection
+  const [simulationId, setSimulationId] = useState(null); // To manage simulation ID for WebSocket
 
-  // Function to load a scenario
-  const loadScenario = async () => {
-    setIsLoading(true);
-    setError(null);
+  // New state for toggling debug info
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
-    try {
-      const response = await fetch("/api/scenario");
-      if (!response.ok) {
-        throw new Error(`Failed to fetch scenario: ${response.status}`);
+  // WebSocket setup and handling effect
+  useEffect(() => {
+    if (!simulationId) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/simulations/${simulationId}`;
+    wsRef.current = new WebSocket(wsUrl);
+
+    wsRef.current.onopen = () => {
+      console.log("WebSocket connection established for React component");
+    };
+
+    wsRef.current.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      console.log("WebSocket message received in React component:", message);
+
+      if (message.type === "simulation_state" || message.type === "simulation_updated") {
+        setScenarioText(message.simulation.scenario?.situation_description || message.simulation.scenario || "Scenario update failed.");
+        setCurrentVideoUrls(message.simulation.video_urls || []);
+        setCurrentAudioUrl(message.simulation.audio_url || null);
+        setTurn(message.simulation.current_turn_number || 1);
+        setHistory(prevHistory => {
+          // Construct history carefully if needed, or rely on API response for full history
+          const assistantMessageContent = message.simulation.scenario?.situation_description || message.simulation.scenario || "No scenario generated.";
+          if (!prevHistory.find(msg => msg.role === 'assistant' && msg.content === assistantMessageContent)) {
+              return [...prevHistory, { role: "assistant", content: assistantMessageContent}];
+          }
+          return prevHistory;
+        });
+
+        // Hide loading after a delay to allow seeing final checkmarks
+        setTimeout(() => setIsLoading(false), 1000);
+
+      } else if (message.type === "progress_update") {
+        console.log(`React: Progress update received for step: ${message.step}`);
+        if (message.step === "scenario_generated") {
+          setScenarioGenerated(true);
+        } else if (message.step === "videos_generated") {
+          setVideosGenerated(true);
+        } else if (message.step === "audio_generated") {
+          setAudioGenerated(true);
+        }
       }
+    };
 
-      const data = await response.json();
-      setScenario(data);
-    } catch (err) {
-      console.error("Error loading scenario:", err);
-      setError(err.message);
-    } finally {
+    wsRef.current.onerror = (error) => {
+      console.error("WebSocket error in React component:", error);
+      setError("WebSocket connection error. Please refresh.");
       setIsLoading(false);
-    }
-  };
+    };
+
+    wsRef.current.onclose = () => {
+      console.log("WebSocket connection closed in React component");
+      // Optional: logic to attempt reconnection if desired
+    };
+
+    // Cleanup function to close WebSocket connection when component unmounts or simulationId changes
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [simulationId]); // Re-run effect if simulationId changes
 
   // Function to handle user response submission
   const handleSubmit = async (e) => {
@@ -49,113 +101,207 @@ export default function SimulationPage({ initialScenario }) {
     if (!userInput.trim() || isLoading || turn >= MAX_TURNS) return;
 
     setIsLoading(true);
-    setHistory((prev) => [...prev, { role: "user", content: userInput }]);
-    setUserInput(""); // Clear input after sending
+    setScenarioGenerated(false);
+    setVideosGenerated(false);
+    setAudioGenerated(false);
+    
+    const currentInput = userInput;
+    // Update history immediately for user feedback
+    setHistory((prev) => [...prev, { role: "user", content: currentInput }]);
+    setUserInput("");
 
     try {
-      // Call API to get the next turn's data
       const response = await fetch("/api/simulation/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          turn: turn + 1,
-          history: [...history, { role: "user", content: userInput }],
-        }), // Send current turn + 1 and full history
+          turn: turn, 
+          history: [...history, { role: "user", content: currentInput }], // Send updated history
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, ${errorData}`);
       }
+      // Backend will now send simulation_state/progress_updates via WebSocket.
+      // The setIsLoading(false) will be handled by the WebSocket onmessage handler.
+      // const data = await response.json(); // No longer need to process data here directly for UI updates
 
-      const data = await response.json();
-
-      console.log("Received data for turn:", turn + 1, data); // Log received data
-
-      // Update state with new data
-      setScenario(data.scenario || "Scenario generation failed.");
-      setVideoUrl(data.videoUrl || "");
-      setNarrationUrl(data.narrationUrl || "");
-      setTurn((prev) => prev + 1); // Increment turn *after* successful processing
-      setHistory((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.scenario || "No scenario generated.",
-        },
-      ]); // Add assistant response to history
     } catch (error) {
       console.error("Error fetching next turn:", error);
-      setScenario(`Error advancing simulation: ${error.message}`);
-      // Optionally reset or handle the error state further
-    } finally {
-      setIsLoading(false);
+      setError(`Error advancing simulation: ${error.message}`);
+      setIsLoading(false); // Ensure loading is false on error
     }
   };
 
   useEffect(() => {
-    // Focus the input field when the component mounts or updates
     if (inputRef.current) {
       inputRef.current.focus();
     }
-    // Scroll to bottom when history updates
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [history, isLoading]); // Depend on history and loading state
+  }, [history, isLoading]);
 
-  // Initial Turn Logic (Turn 0)
-  useEffect(() => {
-    const initializeSimulation = async () => {
-      setIsLoading(true);
-      try {
-        console.log("Initializing simulation (Turn 0)");
-        const response = await fetch("/api/simulation/turn", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ turn: 0, history: [] }), // Start with turn 0 and empty history
-        });
+  const initializeSimulation = async () => {
+    setIsLoading(true);
+    setError(null);
+    setScenarioGenerated(false);
+    setVideosGenerated(false);
+    setAudioGenerated(false);
+    
+    try {
+      console.log("Initializing simulation (Turn 0 -> 1) - React V3");
+      const response = await fetch("/api/simulation/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ turn: 0, history: [] }),
+      });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Received data for Turn 0:", data);
-
-        setScenario(
-          data.scenario || "Welcome! Scenario generation failed for the start.",
-        );
-        setVideoUrl(data.videoUrl || "");
-        setNarrationUrl(data.narrationUrl || "");
-        setTurn(1); // Set turn to 1 after initialization
-        setHistory([
-          { role: "assistant", content: data.scenario || "Welcome!" },
-        ]); // Initialize history
-      } catch (error) {
-        console.error("Error initializing simulation:", error);
-        setScenario(`Error starting simulation: ${error.message}`);
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, ${errorData}`);
       }
-    };
 
-    initializeSimulation();
-  }, []); // Empty dependency array ensures this runs only once on mount
+      const data = await response.json();
+      console.log("Received data for initial turn (React):", data);
+      
+      // Set the simulation ID to trigger WebSocket connection
+      if (data.simulation_id) {
+          setSimulationId(data.simulation_id);
+      } else {
+          // Fallback if simulation_id is not directly in the response, 
+          // but expected in scenario object from a different structure
+          setSimulationId(data.scenario?.simulation_id); 
+      }
+      
+      // The rest of the UI updates (scenario, media, turn, history, isLoading)
+      // will be handled by the WebSocket onmessage handler upon receiving "simulation_state".
+
+    } catch (error) {
+      console.error("Error initializing simulation (React):", error);
+      setError(`Error starting simulation: ${error.message}`);
+      setIsLoading(false); // Ensure loading is false on error
+    }
+  };
+
+  useEffect(() => {
+    // Only run if initialScenario wasn't provided or is minimal
+    // This condition might need adjustment based on how initialScenario is actually used or if it's deprecated
+    if (!initialScenario || !initialScenario.situation_description) { 
+        initializeSimulation();
+    }
+  }, []); // Removed initialScenario from dependencies to prevent re-initialization if prop changes unexpectedly
+
+  // Animated checkmark component with fade-in effect
+  const ProgressItem = ({ label, isComplete }) => (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      marginBottom: "8px",
+      color: isComplete ? "#00ff00" : "#999",
+      transition: "color 0.5s ease",
+      animation: isComplete ? "fadeIn 0.5s ease-in-out" : "none",
+    }}>
+      <span style={{
+        display: "inline-flex",
+        justifyContent: "center",
+        alignItems: "center",
+        width: "24px",
+        height: "24px",
+        borderRadius: "12px",
+        backgroundColor: isComplete ? "#005500" : "#333",
+        marginRight: "10px",
+        transition: "background-color 0.5s ease",
+        fontWeight: "bold",
+      }}>
+        {isComplete ? "✓" : "..."}
+      </span>
+      {label}
+      <span style={{
+        marginLeft: "auto",
+        fontSize: "0.8em",
+        fontWeight: isComplete ? "bold" : "normal",
+        color: isComplete ? "#00ff00" : "#999",
+        transition: "color 0.5s ease",
+      }}>
+        {isComplete ? "Complete" : "Pending"}
+      </span>
+      <style jsx>{`
+        @keyframes fadeIn {
+          0% { opacity: 0.3; transform: scale(0.8); }
+          70% { opacity: 1; transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
 
   return (
     <div style={{
+      padding: '20px', // Added padding to see boundaries
+      border: '5px solid red', // Added border to see boundaries
+      fontFamily: 'Arial, sans-serif', // Basic font for test
       backgroundImage: "url(/UI_background.jpeg)",
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
       minHeight: "100vh",
       display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
+      flexDirection: "column", // Changed to column to stack test elements
+      justifyContent: "flex-start", // Changed to see top elements easily
+      alignItems: "stretch", // Changed to allow full width
       position: "relative",
-      fontFamily: '"Press Start 2P", cursive',
-      color: "#fff",
+      color: "#fff", // Kept for original text if any
     }}>
+      <h1 style={{color: 'lime', backgroundColor: 'black', padding: '10px', textAlign: 'center', fontSize: '24px'}}>SIMULATION.JSX RENDER CHECK V2</h1>
+      
+      {/* Debug Info Toggle - Simplified styling and positioning */}
+      <div style={{
+        margin: '10px 0',
+        padding: '10px',
+        backgroundColor: '#333',
+        border: '2px solid yellow',
+        color: 'white',
+        fontFamily: 'monospace',
+        fontSize: '14px'
+      }}>
+        <button 
+          onClick={() => setShowDebugInfo(!showDebugInfo)}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#555',
+            color: 'white',
+            border: '1px solid #777',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            marginBottom: '10px'
+          }}
+        >
+          {showDebugInfo ? "Hide" : "Show"} Raw Media URLs (Test V2)
+        </button>
+        {showDebugInfo && (
+          <div style={{
+            padding: '10px',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            border: '1px solid #666',
+            borderRadius: '5px',
+            color: '#0f0', // Lime green for visibility
+            whiteSpace: 'pre-wrap', 
+            maxHeight: '250px',
+            overflowY: 'auto'
+          }}>
+            <p><strong>Video URLs (currentVideoUrls):</strong></p>
+            <pre>{JSON.stringify(currentVideoUrls, null, 2)}</pre>
+            <p style={{marginTop: '10px'}}><strong>Audio URL (currentAudioUrl):</strong></p>
+            <pre>{JSON.stringify(currentAudioUrl, null, 2)}</pre>
+            <p style={{marginTop: '10px'}}><strong>Type of video_urls:</strong> {typeof currentVideoUrls}</p>
+            {currentVideoUrls !== null && currentVideoUrls !== undefined && <p><strong>Is video_urls an Array:</strong> {Array.isArray(currentVideoUrls).toString()}</p>}
+          </div>
+        )}
+      </div>
+
       <Head>
         <title>Simulation Arcade</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
@@ -163,12 +309,9 @@ export default function SimulationPage({ initialScenario }) {
 
       {/* Arcade Screen Content Area */}
       <div style={{
-        position: "absolute",
-        top: "22%",
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "56%",
-        height: "50%",
+        position: "relative",
+        width: "80%",
+        margin: "20px auto",
         backgroundColor: "rgba(0, 0, 0, 0.8)",
         border: "5px solid #333",
         borderRadius: "10px",
@@ -184,8 +327,9 @@ export default function SimulationPage({ initialScenario }) {
           color: "#00ff00",
           textShadow: "0 0 5px #00ff00",
           fontSize: "0.8em",
+          fontFamily: '"Press Start 2P", cursive',
         }}>
-          TURN {turn}/{MAX_TURNS}
+          TURN {turn > 0 ? turn : 1}/{MAX_TURNS}
         </div>
 
         {/* Content Grid */}
@@ -196,7 +340,7 @@ export default function SimulationPage({ initialScenario }) {
           flex: 1,
           overflow: "hidden",
         }}>
-          {/* Video Section */}
+          {/* Media Section - Now uses MediaHandler */}
           <div style={{
             backgroundColor: "#111",
             border: "2px solid #444",
@@ -205,118 +349,164 @@ export default function SimulationPage({ initialScenario }) {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            height: "100%",
+            minHeight: '200px',
+            position: 'relative',
           }}>
-            {videoUrl ? (
-              <video
-                key={videoUrl}
-                controls
-                autoPlay
-                muted
-                style={{ maxWidth: "100%", maxHeight: "100%" }}
-              >
-                <source src={videoUrl} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
+            {isLoading ? (
+              <div style={{ 
+                color: "#fff", 
+                textAlign: "center", 
+                padding: "20px",
+                backgroundColor: "rgba(0,0,0,0.7)",
+                borderRadius: "5px",
+                fontFamily: 'monospace',
+                width: "80%",
+              }}>
+                <div style={{ marginBottom: "20px", fontSize: "1.1em", color: "#00ff00" }}>
+                  Generating Content...
+                </div>
+                <ProgressItem label="Scenario Generated" isComplete={scenarioGenerated} />
+                <ProgressItem label="Videos Generated" isComplete={videosGenerated} />
+                <ProgressItem label="Audio Generated" isComplete={audioGenerated} />
+              </div>
             ) : (
-              <p style={{ color: "#666", textAlign: "center" }}>
-                {isLoading ? "Generating video..." : "Video will appear here"}
-              </p>
+              <MediaHandler 
+                video_urls={currentVideoUrls}
+                audio_url={currentAudioUrl}
+                width="100%" 
+                height="100%" 
+              />
             )}
           </div>
 
-          {/* Scenario Section */}
+          {/* Scenario & Chat Section */}
           <div style={{
             display: "flex",
             flexDirection: "column",
             gap: "10px",
             overflow: "hidden",
+            height: "100%",
+            fontFamily: '"Press Start 2P", cursive',
           }}>
+            {/* Scenario Text Area */}
             <div style={{
-              flex: 1,
+              flex: "0 0 30%",
               backgroundColor: "#222",
               border: "2px solid #444",
               padding: "10px",
               borderRadius: "5px",
-              overflow: "auto",
+              overflowY: "auto",
               fontSize: "0.8em",
               lineHeight: "1.4",
+              color: "#ddd",
             }}>
-              {isLoading ? "Loading scenario..." : scenario}
+              {isLoading && !scenarioText ? (
+                <div style={{ textAlign: "center" }}>
+                  <span style={{ color: "#00ff00" }}>Generating scenario...</span>
+                </div>
+              ) : scenarioText}
             </div>
 
-            {/* Audio Player */}
-            {narrationUrl && (
-              <audio
-                key={narrationUrl}
-                controls
-                style={{ width: "100%" }}
-              >
-                <source src={narrationUrl} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
-            )}
+            {/* Chat History Area */}
+            <div style={{
+              flex: "1 1 auto",
+              backgroundColor: "#1a1a1a",
+              border: "2px solid #444",
+              padding: "10px",
+              borderRadius: "5px",
+              overflowY: "auto",
+              fontSize: "0.75em",
+              display: "flex",
+              flexDirection: "column-reverse",
+            }}>
+              <div ref={chatEndRef} />
+              {[...history].reverse().map((msg, index) => (
+                <div key={index} style={{
+                  marginBottom: "8px",
+                  textAlign: msg.role === "user" ? "right" : "left",
+                }}>
+                  <span style={{
+                    backgroundColor: msg.role === "user" ? "#007bff" : "#333",
+                    color: "white",
+                    padding: "5px 10px",
+                    borderRadius: "10px",
+                    display: "inline-block",
+                    maxWidth: "80%",
+                  }}>
+                    {msg.content}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Input Section */}
+        {/* User Input Area - Below the grid */}
         <form onSubmit={handleSubmit} style={{
           marginTop: "15px",
           display: "flex",
           gap: "10px",
+          fontFamily: '"Press Start 2P", cursive',
         }}>
           <input
             ref={inputRef}
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={isLoading ? "Waiting..." : "Enter your response..."}
+            placeholder={turn >= MAX_TURNS ? "Simulation ended." : "Your response..."}
             disabled={isLoading || turn >= MAX_TURNS}
             style={{
-              flex: 1,
-              padding: "8px",
-              backgroundColor: "#111",
-              border: "2px solid #444",
+              flexGrow: 1,
+              padding: "10px",
               borderRadius: "5px",
+              border: "2px solid #444",
+              backgroundColor: "#333",
               color: "#fff",
-              fontFamily: "inherit",
+              fontFamily: 'inherit',
               fontSize: "0.8em",
             }}
           />
-          <button
-            type="submit"
-            disabled={isLoading || turn >= MAX_TURNS || !userInput.trim()}
-            style={{
-              padding: "8px 15px",
-              backgroundColor: "#3a3",
-              border: "none",
-              borderRadius: "5px",
-              color: "#fff",
-              fontFamily: "inherit",
-              fontSize: "0.8em",
-              cursor: "pointer",
-              opacity: isLoading || turn >= MAX_TURNS || !userInput.trim() ? 0.5 : 1,
-            }}
-          >
-            SEND
+          <button type="submit" disabled={isLoading || turn >= MAX_TURNS} style={{
+            padding: "10px 15px",
+            borderRadius: "5px",
+            border: "none",
+            backgroundColor: "#00ff00",
+            color: "#000",
+            cursor: "pointer",
+            fontFamily: 'inherit',
+            fontSize: "0.8em",
+            opacity: (isLoading || turn >= MAX_TURNS) ? 0.5 : 1,
+          }}>
+            Send
           </button>
         </form>
+        
+        {error && (
+          <div style={{ color: "red", marginTop: "10px", fontSize: "0.8em", fontFamily: '"Press Start 2P", cursive' }}>
+            Error: {error}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Keep the getServerSideProps function unchanged
-export async function getServerSideProps() {
+// getServerSideProps might need adjustment if initialScenario structure changes significantly
+export async function getServerSideProps(context) {
+  console.log("getServerSideProps called - TEST MARKER V2");
   try {
     return {
       props: {
-        initialScenario: null,
+        initialScenario: null, 
       },
     };
   } catch (error) {
+    console.error("Error in getServerSideProps:", error);
     return {
       props: {
         initialScenario: null,
+        error: error.message,
       },
     };
   }

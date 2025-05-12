@@ -10,10 +10,12 @@ from prompts.initial_crisis_examples import RATED_EXAMPLES_JSON, UNRATED_EXAMPLE
 from prompts.follow_up_crisis_examples import FOLLOW_UP_CRISIS_EXAMPLE_JSON
 from prompts.conclusion_examples import FINAL_CONCLUSION_EXAMPLE_JSON
 from prompts.scenario_generation_prompt import (
-    CREATE_IDEA_PROMPT_TEMPLATE,
+    INITIAL_GENERATION_TEMPLATE,
+    TURN_GENERATION_TEMPLATE,
     FINAL_TURN_TEMPLATE,
     get_formatted_prompt_template
 )
+from prompts.video_description_generation_prompt import VIDEO_PROMPT_TEMPLATE
 
 # Define an exported constant that combines both rated and unrated examples
 INITIAL_CRISIS_EXAMPLES_JSON = RATED_EXAMPLES_JSON + UNRATED_EXAMPLES_JSON
