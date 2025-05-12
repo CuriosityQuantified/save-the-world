@@ -6,8 +6,9 @@ channel = "stable-24_05"
 packages = ["bash", "libxcrypt"]
 
 [deployment]
-run = ["sh", "-c", "python main.py"]
+run = ["sh", "-c", "python -m uvicorn api.app:app --host 0.0.0.0 --port 5000"]
 deploymentTarget = "cloudrun"
+build = ["sh", "-c", "pip install -r requirements.txt"]
 
 [[ports]]
 localPort = 8000
