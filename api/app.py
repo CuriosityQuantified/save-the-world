@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Interactive Simulation API",
     description="API for the Interactive Simulation system",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api"  # Important for deployment routing
 )
 
 # Add CORS middleware
@@ -136,6 +137,8 @@ def init_services():
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup."""
+    from utils.media import ensure_media_directories
+    ensure_media_directories()  # Ensure directories exist before service init
     init_services()
 
 # Include API routes
