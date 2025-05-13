@@ -152,5 +152,5 @@ app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")
 media_audio_dir = os.path.join(PROJECT_ROOT, "public", "media", "audio")
 media_videos_dir = os.path.join(PROJECT_ROOT, "public", "media", "videos")
 
-app.mount("/sim-local/public/media/audio", StaticFiles(directory=media_audio_dir, check_dir=False), name="media_audio")
-app.mount("/sim-local/public/media/videos", StaticFiles(directory=media_videos_dir, check_dir=False), name="media_videos")
+app.mount("/media/audio", StaticFiles(directory=media_audio_dir, check_dir=False), name="media_audio")
+app.mount("/media/videos", StaticFiles(directory=media_videos_dir, check_dir=False), name="media_videos")
