@@ -184,100 +184,136 @@ class SimulationService:
             # Add the user response to the current turn
             simulation.add_user_response(current_turn, user_response)
             
-            # If the simulation is complete, just return the updated state
+            # If the simulation was already marked complete (e.g., navigating back to a completed sim), just save and return
             if simulation.is_complete:
                 self.state_service.update_simulation(simulation)
                 return simulation
             
-            # Generate the next turn's scenarios
-            next_turn = current_turn + 1
-            
-            # Special handling for the final turn (turn 6)
-            # When the user responds to turn 5, generate a special conclusion scenario
-            is_final_turn = next_turn == simulation.max_turns
-            
-            # Update the simulation's current_turn_number field explicitly
-            simulation.current_turn_number = next_turn
-            
-            # Create the context for LLM
-            context = {
-                "simulation_history": simulation.get_history_text(),
-                "current_turn_number": next_turn,
-                "previous_turn_number": current_turn,
-                "user_prompt_for_this_turn": "Generate a conclusive final scenario that resolves the entire crisis narrative" if is_final_turn else "",
-                "max_turns": simulation.max_turns  # Pass the max_turns parameter
-            }
+            # Determine if the turn just played was the last playable turn
+            is_last_playable_turn = (current_turn == simulation.max_turns)
+
+            if is_last_playable_turn:
+                # Generate the CONCLUSION turn
+                conclusion_turn_number = current_turn + 1
+                simulation.current_turn_number = conclusion_turn_number # Advance to the conclusion turn number
+                
+                logger.info(f"Processing response for turn {current_turn}/{simulation.max_turns}. Generating CONCLUSION for turn {conclusion_turn_number}.")
+                
+                context = {
+                    "simulation_history": simulation.get_history_text(),
+                    "current_turn_number": conclusion_turn_number, # This will make LLMService generate a conclusion
+                    "previous_turn_number": current_turn,
+                    "user_prompt_for_this_turn": "", # No specific user prompt for conclusion generation itself
+                    "max_turns": simulation.max_turns
+                }
+                # Media generation will occur based on the scenario from create_idea
+                # is_complete will be set to True after this block
+            else:
+                # Generate the NEXT REGULAR turn's scenarios
+                next_playable_turn = current_turn + 1
+                simulation.current_turn_number = next_playable_turn # Advance to the next playable turn
+                
+                logger.info(f"Processing response for turn {current_turn}/{simulation.max_turns}. Generating next scenario for turn {next_playable_turn}.")
+
+                context = {
+                    "simulation_history": simulation.get_history_text(),
+                    "current_turn_number": next_playable_turn,
+                    "previous_turn_number": current_turn,
+                    "user_prompt_for_this_turn": "", # Default for regular next turn
+                    "max_turns": simulation.max_turns
+                }
+                # is_complete remains False
             
             # Add the updated simulation to state service before generating the next scenario
-            # This ensures the user response is saved even if scenario generation fails
+            # This ensures the user response and current_turn_number update are saved
             self.state_service.update_simulation(simulation)
             
             try:
-                # Generate a single scenario
+                # Generate a single scenario (either next playable or conclusion based on context.current_turn_number)
                 scenario = await self.llm_service.create_idea(context)
-                logger.info(f"Successfully generated a scenario for turn {next_turn}")
+                logger.info(f"Successfully generated a scenario for turn {simulation.current_turn_number}")
                 
                 # Log the generated scenario
-                logger.info(f"Generated scenario for turn {next_turn}")
-                scenario_id = scenario.get("id", f"scenario_{next_turn}_1")
+                logger.info(f"Generated scenario for turn {simulation.current_turn_number}")
+                scenario_id = scenario.get("id", f"scenario_{simulation.current_turn_number}_1")
                 logger.info(f"Scenario ID: {scenario_id}")
                 logger.debug(f"Scenario Description: {scenario.get('situation_description', '')[:50]}...")
                 
                 # Ensure all required fields exist with defaults if missing
-                description = scenario.get("situation_description", f"Default scenario for turn {next_turn}")
+                description = scenario.get("situation_description", f"Default scenario for turn {simulation.current_turn_number}")
                 rationale = scenario.get("rationale", "Auto-generated")
-                user_role = scenario.get("user_role", "Crisis Response Specialist tasked with solving this absurd global threat")
-                user_prompt = scenario.get("user_prompt", "What strategy will you implement to address this situation and save the world?")
                 
-                scenario_model = Scenario(
-                    id=scenario_id,
-                    situation_description=description,
-                    rationale=rationale,
-                    user_role=user_role,
-                    user_prompt=user_prompt
-                )
+                # Grade, user_role, user_prompt are handled by _validate_scenario in LLMService based on turn context
+                # For conclusion turn, LLMService will include grade/grade_explanation in 'scenario' object
+                # For playable turns, it will include user_role/user_prompt.
+                
+                scenario_model_fields = {
+                    "id": scenario_id,
+                    "situation_description": description,
+                    "rationale": rationale
+                }
+                if "user_role" in scenario: scenario_model_fields["user_role"] = scenario["user_role"]
+                if "user_prompt" in scenario: scenario_model_fields["user_prompt"] = scenario["user_prompt"]
+                if "grade" in scenario: scenario_model_fields["grade"] = scenario["grade"]
+                if "grade_explanation" in scenario: scenario_model_fields["grade_explanation"] = scenario["grade_explanation"]
+
+                scenario_model = Scenario(**scenario_model_fields)
                 
                 # Add the scenario to the simulation
-                simulation.add_scenarios(next_turn, [scenario_model])
+                simulation.add_scenarios(simulation.current_turn_number, [scenario_model])
                 
                 # Automatically select the scenario
-                simulation.select_scenario(next_turn, scenario_id)
+                simulation.select_scenario(simulation.current_turn_number, scenario_id)
                 
                 # Generate media prompts - video prompt only
-                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=next_turn)
+                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=simulation.current_turn_number)
                 
                 # Add media prompts to the simulation state - set narration_script to None
-                simulation.add_media_prompts(next_turn, video_prompt, None)
+                simulation.add_media_prompts(simulation.current_turn_number, video_prompt, None)
                 
-                # Generate media (video and audio in parallel)
-                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=next_turn)
+                # Generate media (video and audio in parallel) - THIS WILL RUN FOR CONCLUSION TURN TOO
+                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=simulation.current_turn_number)
                 
                 # Add media URLs to the simulation state
-                simulation.add_media_urls(next_turn, media_results['video_urls'], media_results['audio_url'])
+                simulation.add_media_urls(simulation.current_turn_number, media_results['video_urls'], media_results['audio_url'])
                 
-                # Check if the simulation is now complete (final turn)
-                simulation.is_complete = (next_turn == simulation.max_turns)
+                # Set simulation as complete if this was the conclusion turn generation
+                if is_last_playable_turn:
+                    simulation.is_complete = True
+                    logger.info(f"Simulation {simulation_id} marked as complete after generating conclusion for turn {simulation.current_turn_number}.")
+
             except Exception as scenario_error:
-                logger.error(f"Error processing scenario for turn {next_turn}: {str(scenario_error)}")
+                logger.error(f"Error processing scenario for turn {simulation.current_turn_number}: {str(scenario_error)}")
                 
                 # Create a fallback scenario
-                fallback_scenario = Scenario(
-                    id=f"scenario_{next_turn}_1",
-                    situation_description=f"Communication issues have affected our analysis systems. Please provide your assessment of the current crisis based on previous information.",
-                    rationale="System-generated fallback due to processing error",
-                    user_role="Crisis Response Specialist",
-                    user_prompt="How would you address the ongoing situation given the information available to you?"
-                )
+                fallback_scenario_fields = {
+                    "id": f"scenario_{simulation.current_turn_number}_1",
+                    "situation_description": f"Communication issues have affected our analysis systems. Please provide your assessment based on previous information.",
+                    "rationale": "System-generated fallback due to processing error",
+                }
+                # If it's not a conclusion, add role/prompt
+                if not is_last_playable_turn:
+                    fallback_scenario_fields["user_role"] = "Crisis Response Specialist"
+                    fallback_scenario_fields["user_prompt"] = "How would you address the ongoing situation given the information available to you?"
+                else: # Fallback for a conclusion turn might include a default grade
+                    fallback_scenario_fields["grade"] = 50
+                    fallback_scenario_fields["grade_explanation"] = "Conclusion generation failed due to system error. Default grade assigned."
+
+                fallback_scenario = Scenario(**fallback_scenario_fields)
                 
                 # Add the fallback scenario
-                simulation.add_scenarios(next_turn, [fallback_scenario])
-                simulation.select_scenario(next_turn, fallback_scenario.id)
+                simulation.add_scenarios(simulation.current_turn_number, [fallback_scenario])
+                simulation.select_scenario(simulation.current_turn_number, fallback_scenario.id)
                 
-                # Add fallback media
-                video_url = "https://example.com/fallback_video.mp4"
-                audio_url = "https://example.com/fallback_audio.mp3"
-                simulation.add_media_prompts(next_turn, "Fallback video prompt", None)
-                simulation.add_media_urls(next_turn, [video_url], audio_url)
+                # Add fallback media (empty for now, or define static fallbacks)
+                simulation.add_media_prompts(simulation.current_turn_number, [], None)
+                simulation.add_media_urls(simulation.current_turn_number, [], None)
+                logger.info(f"Added fallback scenario and empty media for turn {simulation.current_turn_number}.")
+
+                # If conclusion generation failed, still mark simulation as complete
+                if is_last_playable_turn:
+                    simulation.is_complete = True
+                    logger.info(f"Simulation {simulation_id} marked as complete even after fallback for conclusion turn {simulation.current_turn_number}.")
             
             # Update the simulation in the state service
             self.state_service.update_simulation(simulation)

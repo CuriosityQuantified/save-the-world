@@ -111,12 +111,16 @@ export default function SimulationPage({ initialScenario }) {
     setUserInput("");
 
     try {
-      const response = await fetch("/api/simulation/turn", {
+      // Ensure simulationId is available before making the call
+      if (!simulationId) {
+        throw new Error("Simulation ID is not set. Cannot submit response.");
+      }
+      
+      const response = await fetch(`/api/simulations/${simulationId}/respond`, { // NEW: Use respond endpoint
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          turn: turn, 
-          history: [...history, { role: "user", content: currentInput }], // Send updated history
+        body: JSON.stringify({ // NEW: Body according to UserResponseRequest model
+           response_text: currentInput 
         }),
       });
 
@@ -152,11 +156,17 @@ export default function SimulationPage({ initialScenario }) {
     setAudioGenerated(false);
     
     try {
-      console.log("Initializing simulation (Turn 0 -> 1) - React V3");
-      const response = await fetch("/api/simulation/turn", {
+      console.log("Initializing simulation - React V4 - Using POST /api/simulations");
+      // NEW: Call the create_simulation endpoint
+      const response = await fetch("/api/simulations", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ turn: 0, history: [] }),
+        // Send an initial prompt or other required data if necessary
+        // Assuming SimulationRequest might just need developer_mode or an empty prompt for now
+        body: JSON.stringify({ 
+            initial_prompt: "Start a new simulation.", // Example initial prompt
+            developer_mode: false // Assuming default behavior
+        }), 
       });
 
       if (!response.ok) {
@@ -164,20 +174,32 @@ export default function SimulationPage({ initialScenario }) {
         throw new Error(`HTTP error! status: ${response.status}, ${errorData}`);
       }
 
-      const data = await response.json();
-      console.log("Received data for initial turn (React):", data);
+      const data = await response.json(); // data should be the initial SimulationState
+      console.log("Received data from initial POST /api/simulations (React):", data);
       
-      // Set the simulation ID to trigger WebSocket connection
+      // Set the simulation ID from the response to trigger WebSocket connection
       if (data.simulation_id) {
           setSimulationId(data.simulation_id);
+          
+          // Manually update state based on the initial response, as WebSocket might take time
+          setScenarioText(data.scenario?.situation_description || "Scenario loading...");
+          setCurrentVideoUrls(data.video_urls || []);
+          setCurrentAudioUrl(data.audio_url || null);
+          setTurn(data.current_turn_number || 0); // Start at turn 0 or 1 as per backend logic
+          // Initial history might just be the assistant's first message
+          setHistory([{ role: "assistant", content: data.scenario?.situation_description || "Welcome!" }]);
+          
+          // Update progress based on initial state (maybe nothing is generated yet)
+          setScenarioGenerated(!!data.scenario?.situation_description);
+          setVideosGenerated(!!(data.video_urls && data.video_urls.length > 0));
+          setAudioGenerated(!!data.audio_url);
+
       } else {
-          // Fallback if simulation_id is not directly in the response, 
-          // but expected in scenario object from a different structure
-          setSimulationId(data.scenario?.simulation_id); 
+          throw new Error("Simulation ID not received in the initialization response.");
       }
       
-      // The rest of the UI updates (scenario, media, turn, history, isLoading)
-      // will be handled by the WebSocket onmessage handler upon receiving "simulation_state".
+      // Hide loading *after* initial state is set, before WebSocket takes over fully
+      setIsLoading(false); 
 
     } catch (error) {
       console.error("Error initializing simulation (React):", error);

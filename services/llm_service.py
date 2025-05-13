@@ -221,36 +221,39 @@ class LLMService:
         previous_turn_number = context.get("previous_turn_number", 0)
         user_prompt_for_this_turn = context.get("user_prompt_for_this_turn",
                                                 "")
-        max_turns = context.get("max_turns", 6)
+        max_turns = context.get("max_turns", 5)
 
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
 
-        # Determine if this is the final turn
-        is_final_turn = current_turn_number == max_turns
+        # Determine if this is the final turn FOR CONCLUSION generation (i.e., after the last playable turn)
+        # A call for turn 6 (or greater) means we need the conclusion.
+        is_conclusion_generation = current_turn_number > max_turns 
 
-        # Use qwen-qwq-32b for final turn, otherwise use the prioritized models list
-        if is_final_turn:
-            models_to_try = ["qwen-qwq-32b"]
-            logger.info("Using qwen-qwq-32b model for final turn (conclusion with grading)")
+        # Model selection: Use the specific model for conclusion/grading only when generating the conclusion
+        if is_conclusion_generation:
+            models_to_try = ["qwen-qwq-32b"] # Or whichever model is best for conclusion/grading
+            logger.info(f"Generating CONCLUSION for turn {current_turn_number} (after max_turns={max_turns})")
         else:
-            # Models to try in order - Prioritize Maverick
+            # Normal turn model selection
             models_to_try = [
                 "meta-llama/llama-4-maverick-17b-128e-instruct",
                 # "gemini-2.5-flash-preview-04-17", # Removed Gemini
                 "compound-beta-mini",
                 "qwen-qwq-32b"
             ]
+            logger.info(f"Generating normal scenario for turn {current_turn_number}/{max_turns}")
 
         # Determine the appropriate example JSON format based on turn number
-        if is_final_turn:
+        if is_conclusion_generation:
             example_json_output = FINAL_CONCLUSION_EXAMPLE_JSON
         elif current_turn_number == 1:
             example_json_output = INITIAL_CRISIS_EXAMPLES_JSON
-        else:
+        else: # For turns 2 through max_turns (inclusive)
             example_json_output = FOLLOW_UP_CRISIS_EXAMPLE_JSON
 
         # Get the appropriate prompt template
+        # Pass the *actual* max_turns to the template formatter
         template = get_formatted_prompt_template(current_turn_number,
                                                  max_turns)
 
@@ -386,7 +389,7 @@ class LLMService:
                     "num_ideas":
                     num_ideas,
                     "is_final_turn":
-                    is_final_turn
+                    is_conclusion_generation
                 }, model_used, response_time)
 
             # Store the scenario in the dictionary
@@ -418,7 +421,7 @@ class LLMService:
                 "num_ideas":
                 num_ideas,
                 "is_final_turn":
-                is_final_turn
+                is_conclusion_generation
             }, model_used, response_time)
 
         # Parse the JSON result into a list of scenario dictionaries
@@ -525,13 +528,13 @@ class LLMService:
 
             except json.JSONDecodeError as e:
                 logger.error(
-                    f"Failed to parse JSON from LLM output for video scenes: {str(e)}. Raw output snippet: {raw_llm_output[:500]}. Processed snippet for parsing: {json_str[:500]}"
+                    f"Failed to parse JSON from LLM output for video scenes: {str(e)}. Raw output snippet: {raw_llm_output[:1000]}. Processed snippet for parsing: {json_str[:3500]}"
                 )
                 await self.log_interaction(
                     turn_number,
                     "create_video_prompt_parsing_error",
                     formatted_prompt,
-                    f"JSONDecodeError: {str(e)} - Raw: {raw_llm_output[:500]} - Processed: {json_str[:500]}",
+                    f"JSONDecodeError: {str(e)} - Raw: {raw_llm_output[:1000]} - Processed: {json_str[:3500]}",
                     {},
                     model_used,
                     response_time 
@@ -717,12 +720,14 @@ class LLMService:
         rationale = scenario.get("rationale", "Auto-generated")
         
         # Determine if this is the final turn (for streamlined conclusion structure)
-        is_final_turn = current_turn_number >= 5  # Assuming 5 is max_turns
+        # Conclusion structure applies only AFTER the last playable turn.
+        max_turns_value = 5 # Assuming 5 consistently for now, ideally get from config/context
+        is_final_turn_for_structure = current_turn_number > max_turns_value 
         
-        # For non-final turns, include user_role and user_prompt
+        # For non-final turns (including turn 5), include user_role and user_prompt
         user_role = None
         user_prompt = None
-        if not is_final_turn:
+        if not is_final_turn_for_structure:
             user_role = scenario.get(
                 "user_role",
                 "Crisis Response Specialist tasked with solving this absurd global threat"
@@ -737,26 +742,23 @@ class LLMService:
         grade = None
         grade_explanation = None
         
-        # Always set a grade for final turns
-        if is_final_turn:
-            try:
-                if "grade" in scenario:
+        # Only look for grade/explanation if it's the conclusion turn structure
+        if is_final_turn_for_structure:
+            if "grade" in scenario:
+                try:
                     grade_value = int(scenario["grade"])
                     if 1 <= grade_value <= 100:
                         grade = grade_value
                     else:
                         logger.warning(f"Grade value out of range (1-100): {grade_value}. Setting default grade.")
                         grade = 70
-                else:
-                    logger.warning("No grade provided for final turn. Setting default grade.")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid grade format: {scenario.get('grade')}. Setting default grade.")
                     grade = 70
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid grade format: {scenario.get('grade')}. Setting default grade.")
-                grade = 70
             
-            # Ensure grade explanation exists
-            grade_explanation = scenario.get("grade_explanation", "Performance was adequate but with room for improvement in addressing the absurd physics of the situation.")
-        
+            if "grade_explanation" in scenario:
+                grade_explanation = scenario.get("grade_explanation")
+
         # Check for empty or invalid values
         if not situation:
             logger.warning(f"Scenario {index} missing situation_description")
@@ -770,21 +772,18 @@ class LLMService:
         }
         
         # Add user_role and user_prompt for non-final turns
-        if not is_final_turn:
+        if not is_final_turn_for_structure:
             if user_role:
                 result["user_role"] = user_role
             if user_prompt:
                 result["user_prompt"] = user_prompt
         
-        # Add grade fields if they exist (typically for final turn)
-        if grade is not None:
-            result["grade"] = grade
-        if grade_explanation is not None:
-            result["grade_explanation"] = grade_explanation
-            
-        # Log the grade for final turns to help debug
-        if is_final_turn:
-            logger.info(f"Final turn scenario processed with grade: {grade} and explanation: {grade_explanation[:50]}...")
+        # Add grade fields if they exist (typically for final turn conclusion)
+        if is_final_turn_for_structure:
+            if grade is not None:
+                result["grade"] = grade
+            if grade_explanation is not None:
+                result["grade_explanation"] = grade_explanation
             
         return result
 

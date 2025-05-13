@@ -142,7 +142,7 @@ async def startup_event():
     init_services()
 
 # Include API routes
-app.include_router(router, prefix="/api")
+app.include_router(router)
 
 # Mount static files for the frontend
 app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")

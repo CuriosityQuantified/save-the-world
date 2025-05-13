@@ -560,3 +560,85 @@ class MediaService:
                 "success": False,
                 "message": f"Error testing R2 service: {str(e)}"
             }
+
+    async def generate_media_for_turn(self, turn_data, simulation_state, simulation_id):
+        """
+        Generate video and audio for a specific turn in a simulation.
+
+        Args:
+            turn_data: Dictionary containing turn-specific data
+            simulation_state: Dictionary containing simulation-wide state
+            simulation_id: ID of the current simulation
+
+        Returns:
+            Dictionary containing updated data including generated URLs
+        """
+        update_data = {}
+
+        # Generate video
+        video_prompt = turn_data.get("video_prompt", "")
+        video_urls = await self.generate_media_parallel(
+            turn_data.get("selected_scenario", {}), video_prompt, turn_data["turn_number"]
+        )
+        update_data["video_urls"] = video_urls["video_urls"]
+
+        # Generate audio
+        audio_text = ""
+        if turn_data.get("selected_scenario"):
+            scenario = turn_data["selected_scenario"]
+            # Check if it's the final turn (conclusion)
+            if turn_data["turn_number"] == simulation_state["max_turns"] and "grade" in scenario:
+                description = scenario.get("situation_description", "")
+                rationale = scenario.get("rationale", "")
+                grade_explanation = scenario.get("grade_explanation", "")
+                grade = scenario.get("grade", "")
+                # Construct the specific final turn audio text
+                audio_text = f"{description}. {rationale}. {grade_explanation}. Grade {grade}."
+                print(f"[Media Service] Final turn audio text: {audio_text}") # Debugging
+            else:
+                # Standard turn audio text construction
+                description = scenario.get("situation_description", "")
+                # Include user_role and user_prompt only for turn 1, user_prompt for others (excluding final)
+                if turn_data["turn_number"] == 1:
+                    user_role = scenario.get("user_role", "")
+                    user_prompt = scenario.get("user_prompt", "")
+                    audio_text = f"{description} {user_role} {user_prompt}"
+                elif turn_data["turn_number"] < simulation_state["max_turns"]:
+                     user_prompt = scenario.get("user_prompt", "")
+                     audio_text = f"{description} {user_prompt}"
+                # Fallback if somehow description is missing but others aren't
+                if not description and (scenario.get("user_role") or scenario.get("user_prompt")):
+                     audio_text = f"{scenario.get('user_role', '')} {scenario.get('user_prompt', '')}"
+                     
+                print(f"[Media Service] Standard turn audio text: {audio_text}") # Debugging
+
+
+        if audio_text:
+            try:
+                start_time = time.time()
+                # Use the selected TTS service
+                audio_url = await self.tts_service.synthesize(
+                    text=audio_text, simulation_id=simulation_id
+                )
+                end_time = time.time()
+                print(f"[Perf] TTS Generation took {end_time - start_time:.2f} seconds.")
+                
+                if audio_url:
+                    update_data["audio_url"] = audio_url
+                    await self.state_service.update_simulation_turn(
+                        simulation_id, turn_data["turn_number"], {"audio_url": audio_url}
+                    )
+                    # Notify via WebSocket after successful audio generation
+                    await self.notify_progress(simulation_id, "audio_generated")
+                    print(f"[Media Service] Audio generated successfully: {audio_url}")
+                else:
+                     print("[Media Service] Audio generation failed or returned None.")
+
+            except Exception as e:
+                print(f"Error generating audio: {e}")
+                # Log error but continue
+        else:
+            print("[Media Service] No audio text generated for TTS.")
+
+        # Return updated data including the generated URLs
+        return update_data
