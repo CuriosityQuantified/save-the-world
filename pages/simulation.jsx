@@ -434,7 +434,9 @@ export default function SimulationPage({ initialScenario }) {
           }}>
             {/* Scenario Text Area */}
             <div style={{
-              flex: "0 0 30%",
+              flex: "1 1 auto",
+              minHeight: "150px",
+              maxHeight: "300px",
               backgroundColor: "#222",
               border: "2px solid #444",
               padding: "10px",

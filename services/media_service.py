@@ -370,12 +370,21 @@ class MediaService:
             video_coroutines = []
             if isinstance(video_prompt, list):
                 logger.info(f"Received {len(video_prompt)} video prompts. Creating multiple video coroutines.")
+                
+                # Create a wrapper to add delays between video generation requests
+                async def delayed_video_generation(prompt, turn, delay):
+                    """Generate video with a delay to avoid overwhelming the API"""
+                    if delay > 0:
+                        logger.info(f"Waiting {delay:.1f}s before starting video generation...")
+                        await asyncio.sleep(delay)
+                    return await self.generate_video(prompt, turn=turn)
+                
                 for i, single_prompt in enumerate(video_prompt):
                     if isinstance(single_prompt, str):
-                        # Append a unique identifier to the turn for filename uniqueness if desired,
-                        # or let HuggingFaceService handle it. For now, just pass the turn.
-                        logger.info(f"[{time.time():.2f}] Creating video coroutine {i+1} of {len(video_prompt)}")
-                        video_coroutines.append(self.generate_video(single_prompt, turn=turn)) # Potentially add scene_index=i if generate_video is adapted
+                        # Add 0.1 second delay between each video generation request
+                        delay = i * 0.1
+                        logger.info(f"[{time.time():.2f}] Creating video coroutine {i+1} of {len(video_prompt)} with {delay:.1f}s delay")
+                        video_coroutines.append(delayed_video_generation(single_prompt, turn, delay))
                     else:
                         logger.warning(f"Item at index {i} in video_prompt list is not a string: {type(single_prompt)}. Skipping.")
             elif isinstance(video_prompt, str):

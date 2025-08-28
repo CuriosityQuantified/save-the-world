@@ -78,8 +78,8 @@ class HuggingFaceService:
                     f"[Thread {thread_id}] Running HuggingFace client.text_to_video in executor thread... (Attempt {retry_count + 1}/{max_retries})"
                 )
                 
-                # Use timeout that fits within the 2-minute frontend window
-                timeout = 90  # Allow more time within the 2-minute window
+                # Use timeout of 3 minutes for video generation
+                timeout = 180  # 3 minutes timeout for video generation
                 
                 # Log when we're about to make the actual API call
                 import time
