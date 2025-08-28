@@ -109,7 +109,8 @@ class MediaService:
     async def generate_video(self,
                              prompt: str,
                              image_url: Optional[str] = None,
-                             turn: int = 1) -> Optional[str]:
+                             turn: int = 1,
+                             max_retries: int = 3) -> Optional[str]:
         """
         Generate a video using HuggingFace Inference API.
 
@@ -117,6 +118,7 @@ class MediaService:
             prompt: The video generation prompt
             image_url: Optional URL to an image (not used for HuggingFace)
             turn: The current turn number (default: 1)
+            max_retries: Maximum number of retry attempts (default: 3)
 
         Returns:
             URL of the generated video if successful, None otherwise
@@ -130,7 +132,7 @@ class MediaService:
             # Generate video with HuggingFace
             # This might return a file path or binary content
             video_result = await self.huggingface_service.generate_video(
-                prompt, turn=turn, max_retries=3)
+                prompt, turn=turn, max_retries=max_retries)
 
             video_content: Optional[bytes] = None
             filename: str = f"turn_{turn}_{int(time.time())}.mp4"
@@ -377,7 +379,7 @@ class MediaService:
                     if delay > 0:
                         logger.info(f"Waiting {delay:.1f}s before starting video generation...")
                         await asyncio.sleep(delay)
-                    return await self.generate_video(prompt, turn=turn, max_retries=3)
+                    return await self.generate_video(prompt, turn=turn)
                 
                 for i, single_prompt in enumerate(video_prompt):
                     if isinstance(single_prompt, str):
@@ -389,7 +391,7 @@ class MediaService:
                         logger.warning(f"Item at index {i} in video_prompt list is not a string: {type(single_prompt)}. Skipping.")
             elif isinstance(video_prompt, str):
                 logger.info("Received a single video prompt. Creating one video coroutine.")
-                video_coroutines.append(self.generate_video(video_prompt, turn=turn, max_retries=3))
+                video_coroutines.append(self.generate_video(video_prompt, turn=turn))
             else:
                 logger.error(f"Invalid video_prompt type: {type(video_prompt)}. Expected str or list of str.")
                 return {'video_urls': None, 'audio_url': None} # Or handle error appropriately
@@ -426,9 +428,9 @@ class MediaService:
                         f"Video generation task {i+1} (prompt: '{current_prompt_snippet}...') failed with exception: {video_result}"
                     )
                     tb_str = ''.join(
-                        traceback.format_exception(etype=type(video_result),
-                                                   value=video_result,
-                                                   tb=video_result.__traceback__))
+                        traceback.format_exception(type(video_result),
+                                                   video_result,
+                                                   video_result.__traceback__))
                     logger.error(f"Video generation task {i+1} traceback:\\n{tb_str}")
                     video_urls_list.append(None)
                 elif video_result is None:
@@ -450,9 +452,9 @@ class MediaService:
                     f"Audio generation task failed with exception: {audio_result}"
                 )
                 tb_str = ''.join(
-                    traceback.format_exception(etype=type(audio_result),
-                                               value=audio_result,
-                                               tb=audio_result.__traceback__))
+                    traceback.format_exception(type(audio_result),
+                                               audio_result,
+                                               audio_result.__traceback__))
                 logger.error(f"Audio generation traceback:\\n{tb_str}")
             elif audio_result is None:
                 logger.warning(f"Audio generation task returned None.")
