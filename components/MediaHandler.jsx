@@ -572,7 +572,7 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
             zIndex: 10,
           }} onClick={() => {
             setShowPlayButton(false);
-            playCurrentVideo();
+            playCurrentMedia();
           }}>
             <button style={{
               width: '80px',

@@ -3,9 +3,7 @@ import Head from "next/head";
 import MediaHandler from "../components/MediaHandler";
 
 export default function SimulationPage({ initialScenario }) {
-  const [scenarioText, setScenarioText] = useState(
-    initialScenario?.situation_description || "Loading situation...",
-  );
+  // Removed scenarioText state - using history instead
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -69,7 +67,15 @@ export default function SimulationPage({ initialScenario }) {
                           message.simulation.scenario || 
                           "Scenario loading...";
         }
-        setScenarioText(scenarioDisplay);
+        // Add scenario to history as assistant message instead of separate display
+        setHistory(prev => {
+          // Only add if it's a new scenario (avoid duplicates)
+          const lastAssistantMsg = [...prev].reverse().find(msg => msg.role === "assistant");
+          if (!lastAssistantMsg || lastAssistantMsg.content !== scenarioDisplay) {
+            return [...prev, { role: "assistant", content: scenarioDisplay }];
+          }
+          return prev;
+        });
         const videoUrls = currentTurn?.video_urls || message.simulation.video_urls || [];
         const audioUrl = currentTurn?.audio_url || message.simulation.audio_url || null;
         
@@ -80,18 +86,7 @@ export default function SimulationPage({ initialScenario }) {
         // Update generation flags based on actual media presence
         setVideosGenerated(videoUrls.length > 0);
         setAudioGenerated(!!audioUrl);
-        setHistory(prevHistory => {
-          // Construct history carefully if needed, or rely on API response for full history
-          const assistantMessageContent = currentTurn?.selected_scenario?.situation_description || 
-                                         currentTurn?.selected_scenario?.user_prompt || 
-                                         message.simulation.scenario?.situation_description || 
-                                         message.simulation.scenario || 
-                                         "";
-          if (assistantMessageContent && !prevHistory.find(msg => msg.role === 'assistant' && msg.content === assistantMessageContent)) {
-              return [...prevHistory, { role: "assistant", content: assistantMessageContent}];
-          }
-          return prevHistory;
-        });
+        // Removed duplicate setHistory - scenario already added above with all fields
 
         // Hide loading after a delay to allow seeing final checkmarks
         setTimeout(() => setIsLoading(false), 1000);
@@ -234,12 +229,26 @@ export default function SimulationPage({ initialScenario }) {
           const currentTurn = data.turns?.find(t => t.turn_number === currentTurnNumber);
 
           // Manually update state based on the initial response, as WebSocket might take time
-          setScenarioText(currentTurn?.selected_scenario?.situation_description || data.scenario?.situation_description || "Scenario loading...");
+          // Build the full scenario display for the history
+          let fullScenario = "";
+          if (currentTurn?.selected_scenario) {
+            fullScenario = currentTurn.selected_scenario.situation_description || "";
+            if (currentTurn.selected_scenario.user_role) {
+              fullScenario += "\n\n" + currentTurn.selected_scenario.user_role;
+            }
+            if (currentTurn.selected_scenario.user_prompt) {
+              fullScenario += "\n\n" + currentTurn.selected_scenario.user_prompt;
+            }
+          } else if (data.scenario?.situation_description) {
+            fullScenario = data.scenario.situation_description;
+          } else {
+            fullScenario = "Scenario loading...";
+          }
           setCurrentVideoUrls(currentTurn?.video_urls || data.video_urls || []);
           setCurrentAudioUrl(currentTurn?.audio_url || data.audio_url || null);
           setTurn(currentTurnNumber); // Start at turn 0 or 1 as per backend logic
-          // Initial history might just be the assistant's first message
-          setHistory([{ role: "assistant", content: currentTurn?.selected_scenario?.situation_description || data.scenario?.situation_description || "Welcome!" }]);
+          // Initial history with the full scenario
+          setHistory([{ role: "assistant", content: fullScenario || "Welcome!" }]);
 
           // Update progress based on initial state (maybe nothing is generated yet)
           setScenarioGenerated(!!currentTurn?.selected_scenario?.situation_description || !!data.scenario?.situation_description);
@@ -443,67 +452,52 @@ export default function SimulationPage({ initialScenario }) {
             )}
           </div>
 
-          {/* Scenario & Chat Section */}
+          {/* Chat Section - Single window matching video height */}
           <div style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            overflow: "hidden",
             height: "100%",
+            backgroundColor: "#1a1a1a",
+            border: "2px solid #444",
+            padding: "10px",
+            borderRadius: "5px",
+            overflowY: "auto",
+            fontSize: "0.75em",
+            display: "flex",
+            flexDirection: "column-reverse",
             fontFamily: '"Press Start 2P", cursive',
           }}>
-            {/* Scenario Text Area */}
-            <div style={{
-              flex: "1 1 auto",
-              minHeight: "150px",
-              maxHeight: "300px",
-              backgroundColor: "#222",
-              border: "2px solid #444",
-              padding: "10px",
-              borderRadius: "5px",
-              overflowY: "auto",
-              fontSize: "0.8em",
-              lineHeight: "1.4",
-              color: "#ddd",
-            }}>
-              {isLoading && !scenarioText ? (
-                <div style={{ textAlign: "center" }}>
-                  <span style={{ color: "#00ff00" }}>Generating scenario...</span>
-                </div>
-              ) : scenarioText}
-            </div>
-
-            {/* Chat History Area */}
-            <div style={{
-              flex: "1 1 auto",
-              backgroundColor: "#1a1a1a",
-              border: "2px solid #444",
-              padding: "10px",
-              borderRadius: "5px",
-              overflowY: "auto",
-              fontSize: "0.75em",
-              display: "flex",
-              flexDirection: "column-reverse",
-            }}>
-              <div ref={chatEndRef} />
-              {[...history].reverse().map((msg, index) => (
+            <div ref={chatEndRef} />
+            {isLoading && history.length === 0 ? (
+              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                <span style={{ color: "#00ff00" }}>Generating scenario...</span>
+              </div>
+            ) : (
+              [...history].reverse().map((msg, index) => (
                 <div key={index} style={{
-                  marginBottom: "8px",
+                  marginBottom: "12px",
                   textAlign: msg.role === "user" ? "right" : "left",
                 }}>
+                  <div style={{
+                    fontSize: "0.6em",
+                    color: msg.role === "user" ? "#66aaff" : "#66ff66",
+                    marginBottom: "4px",
+                  }}>
+                    {msg.role === "user" ? "You:" : "Scenario:"}
+                  </div>
                   <span style={{
                     backgroundColor: msg.role === "user" ? "#007bff" : "#333",
                     color: "white",
-                    padding: "5px 10px",
+                    padding: "8px 12px",
                     borderRadius: "10px",
                     display: "inline-block",
-                    maxWidth: "80%",
+                    maxWidth: "85%",
+                    whiteSpace: "pre-wrap",
+                    lineHeight: "1.4",
                   }}>
                     {msg.content}
                   </span>
                 </div>
-              ))}
-            </div>
+              ))
+            )}
           </div>
         </div>
 
