@@ -240,7 +240,9 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
   // Handler for when a video finishes playing - swap to the preloaded buffer video
   const handleVideoEnded = () => {
     console.log(`Video ${activeVideoUrl} ended. Current index: ${currentVideoIndex}`);
-    setIsPlaying(false);
+    
+    // Check if audio is still playing - if so, continue the video loop
+    const audioStillPlaying = audioRef.current && !audioRef.current.paused;
     
     // Check if next video is ready in buffer
     if (!nextVideoReady) {
@@ -261,6 +263,15 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
     // Reset readiness states for the swap
     setCurrentVideoReady(nextVideoReady); // The buffer video is now current
     setNextVideoReady(false);         // Need to load the next buffer video
+    
+    // If audio is still playing, keep the video loop going
+    if (audioStillPlaying) {
+      console.log("Audio still playing, continuing video loop...");
+      // Don't set isPlaying to false, keep it true
+    } else {
+      console.log("Audio has ended, stopping video loop");
+      setIsPlaying(false);
+    }
   };
 
   // Video ended event handlers for both players
@@ -290,6 +301,21 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
       bufferVideo.removeEventListener('ended', handleBufferEnded);
     };
   }, [activeVideoRef, currentVideoIndex, nextVideoReady]);
+
+  // Auto-play the next video after swapping if audio is still playing
+  useEffect(() => {
+    // Get the currently active video element
+    const activeVideo = activeVideoRef === 'primary' ? primaryVideoRef.current : bufferVideoRef.current;
+    const audio = audioRef.current;
+    
+    // If we're in playing state, audio is still playing, and we have a video ready
+    if (isPlaying && audio && !audio.paused && activeVideo && currentVideoReady) {
+      console.log("Auto-playing next video after swap...");
+      activeVideo.play().catch(e => {
+        console.error('Error auto-playing next video:', e);
+      });
+    }
+  }, [activeVideoRef, isPlaying, currentVideoReady]);
 
   // Play/pause synchronization between video and audio
   useEffect(() => {
