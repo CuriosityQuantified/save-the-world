@@ -130,11 +130,6 @@ The user_prompt can, but does not always need to have a device to deploy.
 Aim for situations that are easy to visualize, as the video generation will be using the situation description text to generate images.
 </Guidelines>
 
-<scenarios you have generated you should not repeat again>
-- Time zones manifesting
-- Famous artworks from around the world have started to step out of their frames
-</scenarios you have generated you should not repeat again>
-
 <low quality scenarios you have generated>
 Low quality scenario 1:
 {{
@@ -197,6 +192,10 @@ Example 3:
 }}
 </Example JSON Output Format>
 
+Do not generate scenarios related to time, clocks, or time zones.
+Do not generate scenarios related to famous artworks from around the world stepping out of their frames.
+Aim for situations that are easy to visualize, as the video generation will be using the situation description text to generate images.
+Aim for situations that are solvable within a few turns.
 Now, generate a new situation description and user prompt for Turn 1 and following all output requirements:
 """
 
@@ -337,6 +336,7 @@ Example 4:
 </Example JSON Output Format>
 
 Aim for situations that are easy to visualize, as the video generation will be using the situation description text to generate images.
+Always aim for natural consequences that logically follow from the user's actions and the previous history, not random or arbitrary ones. Always incorporate the elements of the simulation history and the user's last response, incorporating consequences of the user's actions or inactions. The level of escalation or resolution should depend upon the quality of the user's response.
 Now, generate the new situation description and user prompt for Turn {current_turn_number} based on the full history provided and following all output requirements.
 """
 
@@ -421,7 +421,7 @@ Example 5:
 {{
   "situation_description": "The situation has spiraled into unprecedented chaos. Your brilliant plan to use ordinary water to dilute emotion-infused coffee beans has resulted in a citywide plumbing system that randomly dispenses either water or concentrated emotional extracts. Citizens now shower in existential dread or brush their teeth with euphoria, depending on the day.",
   "rationale": "The user's solutions were so counterproductive they've achieved almost artistic levels of failure. Each response seemed carefully crafted to maximize absurdity while minimizing effectiveness, as if deliberately attempting to create the world's most dysfunctional emotional utility system. This wasn't just missing the target; this was aiming at a completely different shooting range in another dimension.",
-  "grade": 10,
+  "grade": 0,
   "grade_explanation": "Responses were not only disconnected from scenario constraints but actively worked against any possible resolution. Solutions were illogical, incomplete, and created exponentially more problems with each turn. The user either completely misunderstood the fundamental principles of the scenario or showed such minimal effort that one-word responses would have been equally effective. This performance redefines the bottom of the grading scale."
 }}
 
@@ -435,6 +435,8 @@ Example 6:
 </Example Conclusion JSON Format>
 
 Aim for situations that are easy to visualize, as the video generation will be using the situation description text to generate images.
+Remember to have an extremely high standard for the grade and be brutally honest in the grade.
+Always aim for natural consequences that logically follow from the user's actions and the previous history, not random or arbitrary ones.
 Now, create a conclusion that satisfies all output requirements, with appropriate criticism for poor responses and genuine praise for excellent ones.
 """
 
@@ -442,17 +444,22 @@ Now, create a conclusion that satisfies all output requirements, with appropriat
 def get_formatted_prompt_template(current_turn_number, max_turns):
   """
     Returns the appropriate prompt template based on whether this is the final turn.
-    
+
     Args:
         current_turn_number: The current turn number
         max_turns: The maximum number of turns in the simulation
-        
+
     Returns:
         The appropriate prompt template
     """
-  if current_turn_number == max_turns:
-    return FINAL_TURN_TEMPLATE
-  elif current_turn_number == 1:
+  if current_turn_number == 1:
     return INITIAL_GENERATION_TEMPLATE
+  elif current_turn_number == max_turns:
+    # For the final turn, we need to check if the context indicates we're generating a conclusion.
+    # This is handled in the LLM service by checking if user_prompt_for_this_turn is present.
+    # The template selection here is actually independent of that check.
+    # We'll return FINAL_TURN_TEMPLATE when on the max turn, and LLM service will control
+    # when it's used based on the presence of a user response.
+    return FINAL_TURN_TEMPLATE
   else:
     return TURN_GENERATION_TEMPLATE

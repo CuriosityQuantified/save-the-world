@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import time
+import asyncio
+import traceback
 from langchain.chains import LLMChain
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
@@ -45,19 +47,19 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """
     Service for handling interactions with Language Models.
-    
+
     Provides methods for scenario generation, video prompt creation, 
     and narration script creation.
     """
 
     def __init__(self,
                  api_key: str,
-                 default_model_name: str = "qwen-qwq-32b",
+                 default_model_name: str = "moonshotai/kimi-k2-instruct",
                  # google_api_key: str = None, # Removed Gemini
                  huggingface_service: Optional[HuggingFaceService] = None):
         """
         Initialize the LLM service.
-        
+
         Args:
             api_key: The Groq API key
             default_model_name: The default model to use for generation
@@ -85,12 +87,9 @@ class LLMService:
 
         # Model-specific configurations
         self.model_configs = {
-            "compound-beta-mini": {
+            "moonshotai/kimi-k2-instruct": {
                 "temperature": 1.0
-            },
-            # "gemini-2.5-flash-preview-04-17": { # Removed Gemini
-            #     "temperature": 1.0 # Removed Gemini
-            # }, # Removed Gemini
+            }
         }
 
         # Create model instances
@@ -109,10 +108,10 @@ class LLMService:
         # Pre-initialize the scenarios dictionary with all possible scenario IDs
         self._pre_initialize_scenarios_dict()
 
-    def _pre_initialize_scenarios_dict(self, max_turns: int = 5):
+    def _pre_initialize_scenarios_dict(self, max_turns: int = 3):
         """
         Pre-initialize the scenarios dictionary with all possible scenario IDs.
-        
+
         Args:
             max_turns: Maximum number of turns in the simulation
         """
@@ -127,32 +126,20 @@ class LLMService:
     def _get_llm_instance(self, model_name: str):
         """
         Get or create an LLM instance for the specified model name.
-        
+
         Args:
             model_name: The model to use
-            
+
         Returns:
             The LLM instance
         """
         if model_name not in self.llm_instances:
-            config = self.model_configs.get(model_name, {"temperature": 1.0})
-
-            # Check if this is a Gemini model
-            # if model_name.startswith("gemini-"): # Removed Gemini
-                # if not self.google_api_key: # Removed Gemini
-                    # logger.warning( # Removed Gemini
-                        # "Google API key not provided, falling back to Groq model" # Removed Gemini
-                    # ) # Removed Gemini
-                    # return self._get_llm_instance(self.default_model_name) # Removed Gemini
-
-                # self.llm_instances[model_name] = ChatGoogleGenerativeAI( # Removed Gemini
-                    # model=model_name, # Removed Gemini
-                    # google_api_key=self.google_api_key, # Removed Gemini
-                    # **config) # Removed Gemini
-            # else: # Removed Gemini
-                # Default to Groq models
+            # Force use of moonshotai/kimi-k2-instruct regardless of requested model
+            actual_model = "moonshotai/kimi-k2-instruct"
+            config = self.model_configs.get(actual_model, {"temperature": 1.0})
+            
             self.llm_instances[model_name] = ChatGroq(
-                model_name=model_name,
+                model_name=actual_model,
                 groq_api_key=self.groq_api_key,
                 **config)
 
@@ -162,7 +149,7 @@ class LLMService:
                                                   Awaitable[None]]):
         """
         Set a callback function for logging LLM interactions.
-        
+
         Args:
             callback: An async function that takes a turn number and an LLMLog object
         """
@@ -178,7 +165,7 @@ class LLMService:
                               response_time: float = None):
         """
         Log an LLM interaction if a callback is set.
-        
+
         Args:
             turn_number: The current turn number
             operation_name: The name of the operation being performed
@@ -203,7 +190,7 @@ class LLMService:
     async def create_idea(self, context: Dict[str, Any]) -> Dict[str, str]:
         """
         Generate a single scenario idea based on context.
-        
+
         Args:
             context: The current simulation context including:
                 - simulation_history: The full history of the simulation
@@ -211,7 +198,7 @@ class LLMService:
                 - previous_turn_number: The previous turn number
                 - user_prompt_for_this_turn: Any specific user directions for this turn
                 - max_turns: Maximum number of turns in the simulation (default is 6)
-            
+
         Returns:
             A scenario dictionary with 'id', 'situation_description', 'user_role', 'user_prompt', and 'rationale'
         """
@@ -221,27 +208,24 @@ class LLMService:
         previous_turn_number = context.get("previous_turn_number", 0)
         user_prompt_for_this_turn = context.get("user_prompt_for_this_turn",
                                                 "")
-        max_turns = context.get("max_turns", 5)
+        max_turns = context.get("max_turns", 3)
 
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
 
-        # Determine if this is the final turn FOR CONCLUSION generation (i.e., after the last playable turn)
-        # A call for turn 6 (or greater) means we need the conclusion.
-        is_conclusion_generation = current_turn_number > max_turns 
+        # Determine if this is the final turn FOR CONCLUSION generation 
+        # This now happens when:
+        # 1. The current turn number equals max_turns (we're on turn 5 of 5)
+        # 2. AND we have a user response for this turn (user_prompt_for_this_turn is not empty)
+        is_conclusion_generation = (current_turn_number == max_turns and user_prompt_for_this_turn)
 
-        # Model selection: Use the specific model for conclusion/grading only when generating the conclusion
+        logger.info(f"Turn: {current_turn_number}/{max_turns}, User response: {'Yes' if user_prompt_for_this_turn else 'No'}, Conclusion: {'Yes' if is_conclusion_generation else 'No'}")
+
+        # Model selection: Always use moonshotai/kimi-k2-instruct
+        models_to_try = ["moonshotai/kimi-k2-instruct"]
         if is_conclusion_generation:
-            models_to_try = ["qwen-qwq-32b"] # Or whichever model is best for conclusion/grading
-            logger.info(f"Generating CONCLUSION for turn {current_turn_number} (after max_turns={max_turns})")
+            logger.info(f"Generating CONCLUSION for turn {current_turn_number} (final turn with user response)")
         else:
-            # Normal turn model selection
-            models_to_try = [
-                "meta-llama/llama-4-maverick-17b-128e-instruct",
-                # "gemini-2.5-flash-preview-04-17", # Removed Gemini
-                "compound-beta-mini",
-                "qwen-qwq-32b"
-            ]
             logger.info(f"Generating normal scenario for turn {current_turn_number}/{max_turns}")
 
         # Determine the appropriate example JSON format based on turn number
@@ -277,71 +261,21 @@ class LLMService:
 
         for model_name in models_to_try:
             try:
-                # if model_name.startswith("gemini-") and self.google_api_key: # Removed Gemini
-                    # logger.info(f"Trying with model: {model_name}") # Removed Gemini
-                    # Google Gemini API
-                    # start_time = time.time() # Removed Gemini
-                    # Set slightly more conservative parameters
-                    # gemini_config = self.gemini_config # Removed Gemini
-                    # gemini_config.temperature = 0.7  # Lower temperature for more reliable results # Removed Gemini
+                # Always use moonshotai/kimi-k2-instruct via LangChain
+                logger.info(f"Using Groq model via LangChain: {model_name}")
+                llm = self._get_llm_instance(model_name)
+                chain = LLMChain(
+                    llm=llm,
+                    prompt=PromptTemplate.from_template("{prompt}"))
 
-                    # response = genai.generate_content( # Removed Gemini
-                        # contents=formatted_prompt, # Removed Gemini
-                        # generation_config=gemini_config, # Removed Gemini
-                        # Uncomment if using Vertex AI or specific safety settings
-                        # safety_settings=self.safety_settings
-                    # ) # Removed Gemini
-                    # result = response.text # Removed Gemini
-                    # response_time = time.time() - start_time # Removed Gemini
-                    # model_used = model_name # Removed Gemini
-                    # logger.info( # Removed Gemini
-                        # f"Successfully generated scenario using {model_name}") # Removed Gemini
-                    # break  # Exit loop on success # Removed Gemini
-                # elif model_name.startswith("meta-llama"): # Removed Gemini
-                if model_name.startswith("meta-llama"): # Adjusted conditional
-                    logger.info(f"Trying with Groq model: {model_name}")
-                    # Use direct Groq client for JSON mode
-                    start_time = time.time()
-
-                    chat_completion = self.groq_client.chat.completions.create(
-                        messages=[{
-                            "role":
-                            "system",
-                            "content":
-                            "You are an AI assistant that generates JSON responses based on the user's request. Ensure the output is a single valid JSON object enclosed in ```json ... ```."
-                        }, {
-                            "role": "user",
-                            "content": formatted_prompt,
-                        }],
-                        model=model_name,
-                        temperature=
-                        1.0,  # Explicitly set temperature to 0.7 for Maverick
-                        max_tokens=8192,
-                        response_format={"type": "json_object"},
-                    )
-                    result = chat_completion.choices[0].message.content
-                    response_time = time.time() - start_time
-                    model_used = model_name
-                    logger.info(
-                        f"Successfully generated scenario using {model_name}")
-                    break  # Exit loop on success
-                else:
-                    # Fallback to other Groq models via LangChain if needed
-                    logger.info(
-                        f"Trying with Groq model via LangChain: {model_name}")
-                    llm = self._get_llm_instance(model_name)
-                    chain = LLMChain(
-                        llm=llm,
-                        prompt=PromptTemplate.from_template("{prompt}"))
-
-                    start_time = time.time()
-                    response = await chain.arun(prompt=formatted_prompt)
-                    result = response
-                    response_time = time.time() - start_time
-                    model_used = model_name
-                    logger.info(
-                        f"Successfully generated scenario using {model_name}")
-                    break  # Exit loop on success
+                start_time = time.time()
+                response = await chain.arun(prompt=formatted_prompt)
+                result = response
+                response_time = time.time() - start_time
+                model_used = model_name
+                logger.info(
+                    f"Successfully generated scenario using {model_name}")
+                break  # Exit loop on success
 
             except Exception as e:
                 err_message = f"Error with model {model_name}: {e}"
@@ -452,11 +386,11 @@ class LLMService:
         """
         Generate a video generation prompt from the scenario details,
         parse it, and return a list of scene descriptions.
-        
+
         Args:
             scenario: The scenario dictionary with 'situation_description'
             turn_number: The current turn number for logging
-            
+
         Returns:
             A list of four scene descriptions. Returns an empty list if parsing fails.
         """
@@ -470,7 +404,7 @@ class LLMService:
         formatted_prompt = prompt_template.format(scenario=scenario_text)
 
         raw_llm_output = ""
-        model_used = "meta-llama/llama-4-maverick-17b-128e-instruct"  # Force use of meta-llama/llama-4-maverick-17b-128e-instruct
+        model_used = "moonshotai/kimi-k2-instruct"  # Force use of moonshotai/kimi-k2-instruct
         response_time = None
 
         try:
@@ -481,7 +415,7 @@ class LLMService:
             # The input_variables should match what VIDEO_PROMPT_TEMPLATE expects, which is 'scenario'
             chain_prompt = PromptTemplate(input_variables=["scenario"], template=prompt_template)
             chain = LLMChain(llm=groq_llm, prompt=chain_prompt)
-            
+
             raw_llm_output = await chain.arun(scenario=scenario_text)
             end_time = time.time()
             response_time = end_time - start_time
@@ -493,7 +427,7 @@ class LLMService:
             await self.log_interaction(turn_number, "create_video_prompt_llm_call",
                                        formatted_prompt, raw_llm_output, {},
                                        model_used, response_time)
-            
+
             # Attempt to parse JSON, trying to extract from markdown if necessary
             parsed_json = None
             json_str = raw_llm_output.strip()
@@ -503,11 +437,11 @@ class LLMService:
             if match:
                 json_str = match.group(1).strip()
                 logger.info(f"Extracted JSON string from markdown: {json_str[:200]}...")
-            
+
             try:
                 parsed_json = json.loads(json_str)
                 scenes = parsed_json.get("scenes")
-                
+
                 if isinstance(scenes, list) and all(isinstance(s, str) for s in scenes) and len(scenes) == 4:
                     logger.info(f"Successfully parsed {len(scenes)} scene descriptions.")
                     return scenes
@@ -560,10 +494,10 @@ class LLMService:
     def _parse_scenarios(self, result: str) -> List[str]:
         """
         Parse scenario descriptions from the LLM result.
-        
+
         Args:
             result: The raw LLM result
-            
+
         Returns:
             List of scenario descriptions
         """
@@ -595,11 +529,11 @@ class LLMService:
             current_turn_number: int = 1) -> List[Dict[str, str]]:
         """
         Parse JSON-formatted scenarios from the LLM result.
-        
+
         Args:
             result: The raw LLM result, expected to contain a JSON array or single object
             current_turn_number: The current turn number to use in scenario IDs
-            
+
         Returns:
             List of scenario dictionaries (even if a single object is parsed, it's wrapped in a list)
         """
@@ -610,7 +544,7 @@ class LLMService:
             return [self._create_default_scenario(current_turn_number, 1)]
 
         json_str = result.strip() # Initial strip
-        
+
         # Try to find JSON content between triple backticks if present
         # This regex handles optional 'json' language identifier and surrounding whitespace
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', json_str, re.DOTALL)
@@ -676,11 +610,11 @@ class LLMService:
             current_turn_number: int = 1) -> List[Dict[str, str]]:
         """
         Validate a list of scenarios and ensure they have the required fields.
-        
+
         Args:
             scenarios: List of scenario dictionaries to validate
             current_turn_number: The current turn number to use in scenario IDs
-            
+
         Returns:
             List of validated scenario dictionaries
         """
@@ -698,12 +632,12 @@ class LLMService:
                            index: int = 1) -> Dict[str, str]:
         """
         Validate a single scenario and ensure it has the required fields.
-        
+
         Args:
             scenario: Scenario dictionary to validate
             current_turn_number: The current turn number to use in the scenario ID
             index: Index of the scenario in the list (for generating IDs)
-            
+
         Returns:
             Validated scenario dictionary
         """
@@ -718,12 +652,12 @@ class LLMService:
 
         situation = scenario.get("situation_description", "")
         rationale = scenario.get("rationale", "Auto-generated")
-        
+
         # Determine if this is the final turn (for streamlined conclusion structure)
         # Conclusion structure applies only AFTER the last playable turn.
-        max_turns_value = 5 # Assuming 5 consistently for now, ideally get from config/context
+        max_turns_value = 3 # Assuming 5 consistently for now, ideally get from config/context
         is_final_turn_for_structure = current_turn_number > max_turns_value 
-        
+
         # For non-final turns (including turn 5), include user_role and user_prompt
         user_role = None
         user_prompt = None
@@ -736,12 +670,12 @@ class LLMService:
                 "user_prompt",
                 "What strategy will you implement to address this situation and save the world?"
             )
-        
+
         # Extract grade and grade_explanation for final turns
         # Default grade is 70 (passing) if not provided or invalid
         grade = None
         grade_explanation = None
-        
+
         # Only look for grade/explanation if it's the conclusion turn structure
         if is_final_turn_for_structure:
             if "grade" in scenario:
@@ -755,7 +689,7 @@ class LLMService:
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid grade format: {scenario.get('grade')}. Setting default grade.")
                     grade = 70
-            
+
             if "grade_explanation" in scenario:
                 grade_explanation = scenario.get("grade_explanation")
 
@@ -770,21 +704,21 @@ class LLMService:
             "situation_description": situation,
             "rationale": rationale
         }
-        
+
         # Add user_role and user_prompt for non-final turns
         if not is_final_turn_for_structure:
             if user_role:
                 result["user_role"] = user_role
             if user_prompt:
                 result["user_prompt"] = user_prompt
-        
+
         # Add grade fields if they exist (typically for final turn conclusion)
         if is_final_turn_for_structure:
             if grade is not None:
                 result["grade"] = grade
             if grade_explanation is not None:
                 result["grade_explanation"] = grade_explanation
-            
+
         return result
 
     def _create_default_scenario(self,
@@ -793,12 +727,12 @@ class LLMService:
                                  description: str = None) -> Dict[str, str]:
         """
         Create a default scenario when parsing fails.
-        
+
         Args:
             current_turn_number: The current turn number to use in the scenario ID
             index: Index to use in the scenario ID
             description: Optional description to use
-            
+
         Returns:
             Default scenario dictionary
         """
@@ -818,10 +752,10 @@ class LLMService:
     def get_scenario_by_id(self, scenario_id: str) -> Dict[str, str]:
         """
         Retrieve a scenario by its unique ID.
-        
+
         Args:
             scenario_id: The unique ID of the scenario to retrieve
-            
+
         Returns:
             The scenario dictionary or None if not found
         """
@@ -862,7 +796,7 @@ class LLMService:
                 f"Failed to obtain 4 scene descriptions. Received: {scene_descriptions}. Aborting video sequence generation."
             )
             return []
-        
+
         logger.info(f"Successfully obtained {len(scene_descriptions)} scene descriptions.")
 
         # Step 2: Parallel Video Generation and Upload for each scene
@@ -896,7 +830,7 @@ class LLMService:
                 else:
                     logger.info(f"Successfully generated video for scene {i+1}. URL: {result}")
                     video_urls.append(result)
-            
+
             if len(video_urls) == 4:
                 logger.info("Successfully generated and uploaded all 4 videos.")
                 return video_urls

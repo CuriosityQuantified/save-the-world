@@ -11,6 +11,7 @@ import requests
 import aiohttp
 import asyncio
 import traceback
+import ssl
 from typing import Dict, Any, Optional, Union, List
 import logging
 from services.huggingface_service import HuggingFaceService
@@ -38,6 +39,7 @@ class MediaService:
         cloudflare_r2_secret_access_key: str = None,
         cloudflare_r2_bucket_name: str = None,
         cloudflare_r2_public_access: bool = True,
+        cloudflare_r2_public_url: str = None,
         cloudflare_r2_url_expiry:
         int = 3600  # Default 1 hour expiry for presigned URLs
     ):
@@ -52,6 +54,7 @@ class MediaService:
             cloudflare_r2_secret_access_key: Optional Cloudflare R2 secret access key
             cloudflare_r2_bucket_name: Optional Cloudflare R2 bucket name
             cloudflare_r2_public_access: Whether R2 files should be publicly accessible (default: True)
+            cloudflare_r2_public_url: Optional public URL for the R2 bucket
             cloudflare_r2_url_expiry: Expiry time in seconds for presigned URLs if not using public access
         """
         self.huggingface_api_key = huggingface_api_key
@@ -64,6 +67,7 @@ class MediaService:
             'secret_access_key': cloudflare_r2_secret_access_key,
             'bucket_name': cloudflare_r2_bucket_name,
             'public_access': cloudflare_r2_public_access,
+            'public_url': cloudflare_r2_public_url,
             'url_expiry': cloudflare_r2_url_expiry
         }
 
@@ -82,6 +86,7 @@ class MediaService:
                     secret_access_key=cloudflare_r2_secret_access_key,
                     bucket_name=cloudflare_r2_bucket_name,
                     public_access=cloudflare_r2_public_access,
+                    public_url=cloudflare_r2_public_url,
                     url_expiry=cloudflare_r2_url_expiry)
                 logger.info(
                     f"Cloudflare R2 service initialized successfully (Public access: {cloudflare_r2_public_access})"
@@ -116,7 +121,7 @@ class MediaService:
         Returns:
             URL of the generated video if successful, None otherwise
         """
-        logger.info(f"Generating video with prompt: {prompt[:100]}...")
+        logger.info(f"[generate_video] Called for turn: {turn} with prompt: {prompt[:100]}...") # Log entry with turn
 
         # Ensure media directories exist
         ensure_media_directories()
@@ -129,6 +134,7 @@ class MediaService:
 
             video_content: Optional[bytes] = None
             filename: str = f"turn_{turn}_{int(time.time())}.mp4"
+            logger.info(f"[generate_video] Initial filename for turn {turn}: {filename}") # Log initial filename
 
             # If HuggingFaceService returned a URL, try to fetch it
             if isinstance(video_result,
@@ -136,7 +142,13 @@ class MediaService:
                 try:
                     logger.info(
                         f"Fetching video content from URL: {video_result}")
-                    async with aiohttp.ClientSession() as session:
+                    # Create SSL context that doesn't verify certificates (for development only)
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    
+                    connector = aiohttp.TCPConnector(ssl=ssl_context)
+                    async with aiohttp.ClientSession(connector=connector) as session:
                         async with session.get(video_result) as response:
                             if response.status == 200:
                                 video_content = await response.read()
@@ -183,13 +195,15 @@ class MediaService:
             if video_content and self.r2_service:
                 try:
                     logger.info(
-                        f"Attempting to upload video '{filename}' to Cloudflare R2..."
-                    )
+                        f"[generate_video] Attempting to upload video '{filename}' (for turn {turn}) to Cloudflare R2..."
+                    ) # Log R2 attempt
                     r2_url = await asyncio.to_thread(
                         self.r2_service.upload_video,
                         video_content,
                         filename=filename)
+                    logger.info(f"[generate_video] URL returned by R2 upload for turn {turn}, filename '{filename}': {r2_url}") # Log R2 URL
                     logger.info(f"Video successfully uploaded to R2: {r2_url}")
+                    logger.info(f"[generate_video] Final URL being returned for turn {turn}: {r2_url}") # Log final URL
                     return r2_url
                 except Exception as r2_err:
                     logger.error(
@@ -199,22 +213,27 @@ class MediaService:
 
             # Fallback: Save locally if R2 is not configured, upload failed, or no content found
             if video_content:
-                logger.info("Saving video locally as fallback.")
+                logger.info(f"[generate_video] Saving video locally as fallback for turn {turn}, filename '{filename}'.") # Log local save attempt
                 # Ensure filename is set if not derived earlier
-                if not filename:
+                if not filename: # This case might be redundant if filename is always set initially
                     filename = f"turn_{turn}_{int(time.time())}.mp4"
+                    logger.info(f"[generate_video] Fallback filename generated for turn {turn}: {filename}")
                 paths = save_media_file(video_content, "video", filename)
                 public_url = paths.get('public_url') if paths else None
+                logger.info(f"[generate_video] URL returned by local save for turn {turn}, filename '{filename}': {public_url}") # Log local save URL
                 logger.info(f"Saved video content to local file: {public_url}")
+                logger.info(f"[generate_video] Final URL being returned for turn {turn}: {public_url}") # Log final URL
                 return public_url
             else:
                 logger.error(
                     "No valid video content could be obtained or processed.")
+                logger.info(f"[generate_video] Returning None for turn {turn} as no video content.") # Log return None
                 return None
 
         except Exception as e:
-            logger.error(f"Error generating video: {str(e)}")
+            logger.error(f"[generate_video] Error generating video for turn {turn}: {str(e)}") # Log error with turn
             logger.error(traceback.format_exc())
+            logger.info(f"[generate_video] Returning None for turn {turn} due to exception.") # Log return None due to exception
             return None
 
     async def generate_audio(self,
@@ -230,17 +249,25 @@ class MediaService:
         Returns:
             URL of the generated audio if successful, None otherwise
         """
-        # Combine the scenario fields into a concise narration script
+        logger.info(f"[generate_audio] Called for turn: {turn}") # Log entry
         situation = scenario.get('situation_description', '')
         user_role = scenario.get('user_role', '')
         user_prompt = scenario.get('user_prompt', '')
 
         # Create a concise script that combines these elements
         # Include user_role only if it's available and this is the first turn
-        if turn == 1 and user_role:
+        if "grade" in scenario and "grade_explanation" in scenario: # Check for conclusion scenario
+            rationale = scenario.get('rationale', '')
+            grade_explanation = scenario.get('grade_explanation', '')
+            grade_value = scenario.get('grade', 'Not graded') # Default if grade is missing
+            script = f"{situation} {rationale} {grade_explanation} Your final grade is: {str(grade_value)}."
+            logger.info(f"Conclusion audio script generated: {script[:100]}...")
+        elif turn == 1 and user_role:
             script = f"{situation} {user_role} {user_prompt}"
-        else:
+            logger.info(f"Turn 1 audio script: {script[:100]}...")
+        else: # Other regular turns
             script = f"{situation} {user_prompt}"
+            logger.info(f"Regular turn ({turn}) audio script: {script[:100]}...")
 
         logger.info(f"Generating audio for scenario with Groq TTS")
         logger.info(f"Script: {script[:100]}...")
@@ -262,20 +289,23 @@ class MediaService:
 
             # Generate filename
             filename = f"turn_{turn}_{int(time.time())}.mp3"
+            logger.info(f"[generate_audio] Generated filename for turn {turn}: {filename}") # Log filename
 
             # Try uploading to R2 if configured
             if self.r2_service:
                 try:
                     logger.info(
-                        f"Attempting to upload audio '{filename}' to Cloudflare R2..."
-                    )
+                        f"[generate_audio] Attempting to upload audio '{filename}' (for turn {turn}) to Cloudflare R2..."
+                    ) # Log R2 attempt
                     public_url = await asyncio.to_thread(
                         self.r2_service.upload_audio, audio_data, filename)
+                    logger.info(f"[generate_audio] URL returned by R2 upload for turn {turn}, filename '{filename}': {public_url}") # Log R2 URL
 
                     # Check if a valid URL was returned
                     if public_url and isinstance(
                             public_url, str) and public_url.startswith("http"):
                         logger.info(f"Audio uploaded to R2: {public_url}")
+                        logger.info(f"[generate_audio] Final URL being returned for turn {turn}: {public_url}") # Log final URL
                         return public_url
                     else:
                         # Log if the upload method didn't return a valid URL string
@@ -294,21 +324,23 @@ class MediaService:
                     # Fall through to local save below
 
             # Fallback: Save the audio locally
-            logger.info("Saving audio locally as fallback.")
+            logger.info(f"[generate_audio] Saving audio locally as fallback for turn {turn}, filename '{filename}'.") # Log local save attempt
             # Assuming save_media_file returns the public URL string directly
             public_url = save_media_file(audio_data, "audio", filename)
+            logger.info(f"[generate_audio] URL returned by local save for turn {turn}, filename '{filename}': {public_url}") # Log local save URL
 
             # Log whether the local save returned a valid path
             if public_url:
                 logger.info(
-                    f"Audio generation complete (local save): {public_url}")
+                    f"[generate_audio] Audio generation complete (local save): {public_url}")
+                logger.info(f"[generate_audio] Final URL being returned for turn {turn}: {public_url}") # Log final URL
             else:
-                logger.error("Local save of audio failed to return a path.")
+                logger.error("[generate_audio] Local save of audio failed to return a path.")
 
             return public_url  # Return the path from local save or None
 
         except Exception as e:
-            logger.error(f"Error generating audio: {str(e)}")
+            logger.error(f"[generate_audio] Error generating audio for turn {turn}: {str(e)}") # Log error
             logger.error(traceback.format_exc())
             return None
 
@@ -342,6 +374,7 @@ class MediaService:
                     if isinstance(single_prompt, str):
                         # Append a unique identifier to the turn for filename uniqueness if desired,
                         # or let HuggingFaceService handle it. For now, just pass the turn.
+                        logger.info(f"[{time.time():.2f}] Creating video coroutine {i+1} of {len(video_prompt)}")
                         video_coroutines.append(self.generate_video(single_prompt, turn=turn)) # Potentially add scene_index=i if generate_video is adapted
                     else:
                         logger.warning(f"Item at index {i} in video_prompt list is not a string: {type(single_prompt)}. Skipping.")
@@ -369,6 +402,7 @@ class MediaService:
             )
             results = await asyncio.gather(*all_tasks, return_exceptions=True)
             logger.info(f"[{time.time():.2f}] asyncio.gather completed.")
+            logger.info(f"[generate_media_parallel] Raw results from asyncio.gather for turn {turn}: {results}") # Log raw results
 
             video_urls_list: List[Optional[str]] = []
             num_video_tasks = len(video_coroutines)
@@ -396,7 +430,7 @@ class MediaService:
                     logger.info(
                         f"[{time.time():.2f}] Video generation task {i+1} (prompt: '{current_prompt_snippet}...') finished successfully: {video_result}"
                     )
-            
+
             # Process audio result (it's the last one in the results list)
             audio_url: Optional[str] = None
             audio_result = results[num_video_tasks] # Audio result is after all video results
@@ -424,6 +458,7 @@ class MediaService:
                 f"Parallel media generation for turn {turn} completed in {end_time - start_time:.2f} seconds. Videos: {video_urls_list}, Audio: {audio_url}"
             )
 
+            logger.info(f"[generate_media_parallel] About to return for turn {turn} - Video URLs: {video_urls_list}, Audio URL: {audio_url}") # Log before returning
             return {'video_urls': video_urls_list, 'audio_url': audio_url}
 
         except Exception as e:
@@ -609,7 +644,7 @@ class MediaService:
                 # Fallback if somehow description is missing but others aren't
                 if not description and (scenario.get("user_role") or scenario.get("user_prompt")):
                      audio_text = f"{scenario.get('user_role', '')} {scenario.get('user_prompt', '')}"
-                     
+
                 print(f"[Media Service] Standard turn audio text: {audio_text}") # Debugging
 
 
@@ -622,7 +657,7 @@ class MediaService:
                 )
                 end_time = time.time()
                 print(f"[Perf] TTS Generation took {end_time - start_time:.2f} seconds.")
-                
+
                 if audio_url:
                     update_data["audio_url"] = audio_url
                     await self.state_service.update_simulation_turn(

@@ -36,7 +36,7 @@ if __name__ == "__main__":
     
     # Get host and port from environment or use defaults
     host = os.getenv("HOST", "0.0.0.0")
-    default_port = int(os.getenv("PORT", 5000))
+    default_port = int(os.getenv("PORT", 8000))
     
     # Add a small delay to ensure any previous socket is fully released
     time.sleep(1)

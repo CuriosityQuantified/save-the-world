@@ -10,9 +10,9 @@ export default function SimulationPage({ initialScenario }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turn, setTurn] = useState(0);
-  const [MAX_TURNS, setMAX_TURNS] = useState(5);
+  const [MAX_TURNS, setMAX_TURNS] = useState(4);
   const [userInput, setUserInput] = useState("");
-  
+
   // State for media URLs received from the backend
   const [currentVideoUrls, setCurrentVideoUrls] = useState([]);
   const [currentAudioUrl, setCurrentAudioUrl] = useState(null);
@@ -28,15 +28,16 @@ export default function SimulationPage({ initialScenario }) {
   const wsRef = useRef(null); // Ref to hold the WebSocket connection
   const [simulationId, setSimulationId] = useState(null); // To manage simulation ID for WebSocket
 
-  // New state for toggling debug info
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  // State for managing simulation initialization
+  const [simulationStarted, setSimulationStarted] = useState(false);
 
   // WebSocket setup and handling effect
   useEffect(() => {
     if (!simulationId) return;
 
+    // Connect directly to backend on port 8000, bypassing proxy
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/simulations/${simulationId}`;
+    const wsUrl = `${protocol}//localhost:8000/ws/simulations/${simulationId}`;
     wsRef.current = new WebSocket(wsUrl);
 
     wsRef.current.onopen = () => {
@@ -48,10 +49,21 @@ export default function SimulationPage({ initialScenario }) {
       console.log("WebSocket message received in React component:", message);
 
       if (message.type === "simulation_state" || message.type === "simulation_updated") {
-        setScenarioText(message.simulation.scenario?.situation_description || message.simulation.scenario || "Scenario update failed.");
-        setCurrentVideoUrls(message.simulation.video_urls || []);
-        setCurrentAudioUrl(message.simulation.audio_url || null);
-        setTurn(message.simulation.current_turn_number || 1);
+        // Get the current turn data
+        const currentTurnNumber = message.simulation.current_turn_number || 1;
+        const currentTurn = message.simulation.turns?.find(t => t.turn_number === currentTurnNumber);
+        
+        setScenarioText(currentTurn?.selected_scenario?.situation_description || message.simulation.scenario?.situation_description || message.simulation.scenario || "Scenario update failed.");
+        const videoUrls = currentTurn?.video_urls || message.simulation.video_urls || [];
+        const audioUrl = currentTurn?.audio_url || message.simulation.audio_url || null;
+        
+        setCurrentVideoUrls(videoUrls);
+        setCurrentAudioUrl(audioUrl);
+        setTurn(currentTurnNumber);
+        
+        // Update generation flags based on actual media presence
+        setVideosGenerated(videoUrls.length > 0);
+        setAudioGenerated(!!audioUrl);
         setHistory(prevHistory => {
           // Construct history carefully if needed, or rely on API response for full history
           const assistantMessageContent = message.simulation.scenario?.situation_description || message.simulation.scenario || "No scenario generated.";
@@ -104,7 +116,7 @@ export default function SimulationPage({ initialScenario }) {
     setScenarioGenerated(false);
     setVideosGenerated(false);
     setAudioGenerated(false);
-    
+
     const currentInput = userInput;
     // Update history immediately for user feedback
     setHistory((prev) => [...prev, { role: "user", content: currentInput }]);
@@ -115,14 +127,22 @@ export default function SimulationPage({ initialScenario }) {
       if (!simulationId) {
         throw new Error("Simulation ID is not set. Cannot submit response.");
       }
+
+      // Add 2-minute timeout for response processing
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
       
-      const response = await fetch(`/api/simulations/${simulationId}/respond`, { // NEW: Use respond endpoint
+      // Call backend directly to avoid proxy timeout issues
+      const response = await fetch(`http://localhost:8000/simulations/${simulationId}/respond`, { // NEW: Use respond endpoint
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ // NEW: Body according to UserResponseRequest model
            response_text: currentInput 
         }),
+        signal: controller.signal // Add abort signal for timeout
       });
+      
+      clearTimeout(timeoutId); // Clear timeout if request completes
 
       if (!response.ok) {
         const errorData = await response.text();
@@ -154,11 +174,16 @@ export default function SimulationPage({ initialScenario }) {
     setScenarioGenerated(false);
     setVideosGenerated(false);
     setAudioGenerated(false);
-    
+
     try {
       console.log("Initializing simulation - React V4 - Using POST /api/simulations");
-      // NEW: Call the create_simulation endpoint
-      const response = await fetch("/api/simulations", { 
+      
+      // Add 2-minute timeout for video generation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+      
+      // Call backend directly to avoid proxy timeout issues
+      const response = await fetch("http://localhost:8000/simulations", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Send an initial prompt or other required data if necessary
@@ -166,8 +191,11 @@ export default function SimulationPage({ initialScenario }) {
         body: JSON.stringify({ 
             initial_prompt: "Start a new simulation.", // Example initial prompt
             developer_mode: false // Assuming default behavior
-        }), 
+        }),
+        signal: controller.signal // Add abort signal for timeout
       });
+      
+      clearTimeout(timeoutId); // Clear timeout if request completes
 
       if (!response.ok) {
         const errorData = await response.text();
@@ -176,28 +204,32 @@ export default function SimulationPage({ initialScenario }) {
 
       const data = await response.json(); // data should be the initial SimulationState
       console.log("Received data from initial POST /api/simulations (React):", data);
-      
+
       // Set the simulation ID from the response to trigger WebSocket connection
       if (data.simulation_id) {
           setSimulationId(data.simulation_id);
-          
+
+          // Get the current turn data from the nested structure
+          const currentTurnNumber = data.current_turn_number || 0;
+          const currentTurn = data.turns?.find(t => t.turn_number === currentTurnNumber);
+
           // Manually update state based on the initial response, as WebSocket might take time
-          setScenarioText(data.scenario?.situation_description || "Scenario loading...");
-          setCurrentVideoUrls(data.video_urls || []);
-          setCurrentAudioUrl(data.audio_url || null);
-          setTurn(data.current_turn_number || 0); // Start at turn 0 or 1 as per backend logic
+          setScenarioText(currentTurn?.selected_scenario?.situation_description || data.scenario?.situation_description || "Scenario loading...");
+          setCurrentVideoUrls(currentTurn?.video_urls || data.video_urls || []);
+          setCurrentAudioUrl(currentTurn?.audio_url || data.audio_url || null);
+          setTurn(currentTurnNumber); // Start at turn 0 or 1 as per backend logic
           // Initial history might just be the assistant's first message
-          setHistory([{ role: "assistant", content: data.scenario?.situation_description || "Welcome!" }]);
-          
+          setHistory([{ role: "assistant", content: currentTurn?.selected_scenario?.situation_description || data.scenario?.situation_description || "Welcome!" }]);
+
           // Update progress based on initial state (maybe nothing is generated yet)
-          setScenarioGenerated(!!data.scenario?.situation_description);
-          setVideosGenerated(!!(data.video_urls && data.video_urls.length > 0));
-          setAudioGenerated(!!data.audio_url);
+          setScenarioGenerated(!!currentTurn?.selected_scenario?.situation_description || !!data.scenario?.situation_description);
+          setVideosGenerated(!!(currentTurn?.video_urls && currentTurn.video_urls.length > 0) || !!(data.video_urls && data.video_urls.length > 0));
+          setAudioGenerated(!!currentTurn?.audio_url || !!data.audio_url);
 
       } else {
           throw new Error("Simulation ID not received in the initialization response.");
       }
-      
+
       // Hide loading *after* initial state is set, before WebSocket takes over fully
       setIsLoading(false); 
 
@@ -208,13 +240,7 @@ export default function SimulationPage({ initialScenario }) {
     }
   };
 
-  useEffect(() => {
-    // Only run if initialScenario wasn't provided or is minimal
-    // This condition might need adjustment based on how initialScenario is actually used or if it's deprecated
-    if (!initialScenario || !initialScenario.situation_description) { 
-        initializeSimulation();
-    }
-  }, []); // Removed initialScenario from dependencies to prevent re-initialization if prop changes unexpectedly
+  // Removed automatic initialization - now triggered by button click
 
   // Animated checkmark component with fade-in effect
   const ProgressItem = ({ label, isComplete }) => (
@@ -262,74 +288,69 @@ export default function SimulationPage({ initialScenario }) {
 
   return (
     <div style={{
-      padding: '20px', // Added padding to see boundaries
-      border: '5px solid red', // Added border to see boundaries
-      fontFamily: 'Arial, sans-serif', // Basic font for test
+      fontFamily: 'Arial, sans-serif',
       backgroundImage: "url(/UI_background.jpeg)",
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
       minHeight: "100vh",
       display: "flex",
-      flexDirection: "column", // Changed to column to stack test elements
-      justifyContent: "flex-start", // Changed to see top elements easily
-      alignItems: "stretch", // Changed to allow full width
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
       position: "relative",
-      color: "#fff", // Kept for original text if any
+      color: "#fff",
     }}>
-      <h1 style={{color: 'lime', backgroundColor: 'black', padding: '10px', textAlign: 'center', fontSize: '24px'}}>SIMULATION.JSX RENDER CHECK V2</h1>
-      
-      {/* Debug Info Toggle - Simplified styling and positioning */}
-      <div style={{
-        margin: '10px 0',
-        padding: '10px',
-        backgroundColor: '#333',
-        border: '2px solid yellow',
-        color: 'white',
-        fontFamily: 'monospace',
-        fontSize: '14px'
-      }}>
-        <button 
-          onClick={() => setShowDebugInfo(!showDebugInfo)}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#555',
-            color: 'white',
-            border: '1px solid #777',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginBottom: '10px'
-          }}
-        >
-          {showDebugInfo ? "Hide" : "Show"} Raw Media URLs (Test V2)
-        </button>
-        {showDebugInfo && (
-          <div style={{
-            padding: '10px',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            border: '1px solid #666',
-            borderRadius: '5px',
-            color: '#0f0', // Lime green for visibility
-            whiteSpace: 'pre-wrap', 
-            maxHeight: '250px',
-            overflowY: 'auto'
-          }}>
-            <p><strong>Video URLs (currentVideoUrls):</strong></p>
-            <pre>{JSON.stringify(currentVideoUrls, null, 2)}</pre>
-            <p style={{marginTop: '10px'}}><strong>Audio URL (currentAudioUrl):</strong></p>
-            <pre>{JSON.stringify(currentAudioUrl, null, 2)}</pre>
-            <p style={{marginTop: '10px'}}><strong>Type of video_urls:</strong> {typeof currentVideoUrls}</p>
-            {currentVideoUrls !== null && currentVideoUrls !== undefined && <p><strong>Is video_urls an Array:</strong> {Array.isArray(currentVideoUrls).toString()}</p>}
-          </div>
-        )}
-      </div>
 
       <Head>
         <title>Simulation Arcade</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Arcade Screen Content Area */}
+      {/* Start New Simulation Button - Show when not started */}
+      {!simulationStarted && (
+        <div style={{
+          textAlign: "center",
+          marginBottom: "40px",
+        }}>
+          <button
+            onClick={() => {
+              setSimulationStarted(true);
+              initializeSimulation();
+            }}
+            disabled={isLoading}
+            style={{
+              padding: "20px 40px",
+              fontSize: "1.2em",
+              fontFamily: '"Press Start 2P", cursive',
+              backgroundColor: "#00ff00",
+              color: "#000",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              textShadow: "0 0 5px #00ff00",
+              boxShadow: "0 0 20px rgba(0, 255, 0, 0.5)",
+              transition: "all 0.3s ease",
+              opacity: isLoading ? 0.5 : 1,
+            }}
+            onMouseOver={(e) => {
+              if (!isLoading) {
+                e.target.style.transform = "scale(1.1)";
+                e.target.style.boxShadow = "0 0 30px rgba(0, 255, 0, 0.8)";
+              }
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 0 20px rgba(0, 255, 0, 0.5)";
+            }}
+          >
+            {isLoading ? "Starting..." : "Start New Simulation"}
+          </button>
+        </div>
+      )}
+
+      {/* Arcade Screen Content Area - Show after simulation starts */}
+      {simulationStarted && (
       <div style={{
         position: "relative",
         width: "80%",
@@ -476,8 +497,8 @@ export default function SimulationPage({ initialScenario }) {
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={turn >= MAX_TURNS ? "Simulation ended." : "Your response..."}
-            disabled={isLoading || turn >= MAX_TURNS}
+            placeholder={turn >= MAX_TURNS ? "Simulation ended." : !simulationId ? "Start a simulation first..." : "Your response..."}
+            disabled={isLoading || turn >= MAX_TURNS || !simulationId}
             style={{
               flexGrow: 1,
               padding: "10px",
@@ -489,7 +510,7 @@ export default function SimulationPage({ initialScenario }) {
               fontSize: "0.8em",
             }}
           />
-          <button type="submit" disabled={isLoading || turn >= MAX_TURNS} style={{
+          <button type="submit" disabled={isLoading || turn >= MAX_TURNS || !simulationId} style={{
             padding: "10px 15px",
             borderRadius: "5px",
             border: "none",
@@ -498,25 +519,24 @@ export default function SimulationPage({ initialScenario }) {
             cursor: "pointer",
             fontFamily: 'inherit',
             fontSize: "0.8em",
-            opacity: (isLoading || turn >= MAX_TURNS) ? 0.5 : 1,
+            opacity: (isLoading || turn >= MAX_TURNS || !simulationId) ? 0.5 : 1,
           }}>
             Send
           </button>
         </form>
-        
+
         {error && (
           <div style={{ color: "red", marginTop: "10px", fontSize: "0.8em", fontFamily: '"Press Start 2P", cursive' }}>
             Error: {error}
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
 
-// getServerSideProps might need adjustment if initialScenario structure changes significantly
 export async function getServerSideProps(context) {
-  console.log("getServerSideProps called - TEST MARKER V2");
   try {
     return {
       props: {

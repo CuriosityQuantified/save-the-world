@@ -36,6 +36,7 @@ class CloudflareR2Service:
         secret_access_key: str, 
         bucket_name: str,
         public_access: bool = True,
+        public_url: Optional[str] = None,
         url_expiry: int = 3600,  # Default 1 hour expiry for presigned URLs
         max_retries: int = 3,
         retry_delay: int = 1,  # Delay in seconds between retries
@@ -49,6 +50,7 @@ class CloudflareR2Service:
             secret_access_key: The Cloudflare R2 secret access key
             bucket_name: The Cloudflare R2 bucket name
             public_access: Whether files should be publicly accessible (default: True)
+            public_url: The public URL for the R2 bucket (if public access is enabled)
             url_expiry: Expiry time in seconds for presigned URLs (default: 3600)
             max_retries: Maximum number of retry attempts for operations (default: 3)
             retry_delay: Delay in seconds between retry attempts (default: 1)
@@ -58,6 +60,7 @@ class CloudflareR2Service:
         self.secret_access_key = secret_access_key
         self.bucket_name = bucket_name
         self.public_access = public_access
+        self.public_url = public_url
         self.url_expiry = url_expiry
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -71,7 +74,7 @@ class CloudflareR2Service:
             region_name='auto',  # Cloudflare R2 uses 'auto' for region
             config=Config(
                 signature_version='s3v4',
-                s3={'addressing_style': 'virtual'},
+                s3={'addressing_style': 'path'},  # R2 requires path-style addressing
                 retries={'max_attempts': max_retries, 'mode': 'standard'}
             )
         )
@@ -208,8 +211,11 @@ class CloudflareR2Service:
             logger.info(f"Video upload completed in {upload_time:.2f}s")
             
             # Generate the appropriate URL
-            if self.public_access:
-                # Public URL
+            if self.public_access and self.public_url:
+                # Use the public URL
+                url = f"{self.public_url}/{object_key}"
+            elif self.public_access:
+                # Fallback to endpoint-based public URL
                 url = f"{self.endpoint}/{self.bucket_name}/{object_key}"
             else:
                 # Generate a presigned URL with expiry
@@ -280,8 +286,11 @@ class CloudflareR2Service:
             logger.info(f"Audio upload completed in {upload_time:.2f}s")
             
             # Generate the appropriate URL
-            if self.public_access:
-                # Public URL
+            if self.public_access and self.public_url:
+                # Use the public URL
+                url = f"{self.public_url}/{object_key}"
+            elif self.public_access:
+                # Fallback to endpoint-based public URL
                 url = f"{self.endpoint}/{self.bucket_name}/{object_key}"
             else:
                 # Generate a presigned URL with expiry
@@ -371,8 +380,11 @@ class CloudflareR2Service:
             )
             
             # Generate the appropriate URL
-            if self.public_access:
-                # Public URL
+            if self.public_access and self.public_url:
+                # Use the public URL
+                url = f"{self.public_url}/{object_key}"
+            elif self.public_access:
+                # Fallback to endpoint-based public URL
                 url = f"{self.endpoint}/{self.bucket_name}/{object_key}"
             else:
                 # Generate a presigned URL with expiry

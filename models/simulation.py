@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
 from datetime import datetime
 import json
@@ -42,7 +42,7 @@ class SimulationTurn(BaseModel):
     scenarios: List[Scenario] = []
     selected_scenario: Optional[Scenario] = None
     user_response: Optional[UserResponse] = None
-    video_prompt: Optional[str] = None
+    video_prompt: Optional[Union[str, List[str]]] = None
     narration_script: Optional[str] = None
     video_urls: Optional[List[str]] = None
     audio_url: Optional[str] = None
@@ -172,13 +172,13 @@ class SimulationState(BaseModel):
                 
             self.updated_at = datetime.now()
     
-    def add_media_prompts(self, turn_number: int, video_prompt: str, narration_script: str) -> None:
+    def add_media_prompts(self, turn_number: int, video_prompt: Union[str, List[str]], narration_script: str) -> None:
         """
         Adds video and narration prompts to the specified turn.
         
         Args:
             turn_number: The turn number to add prompts to
-            video_prompt: The prompt for video generation
+            video_prompt: The prompt for video generation (can be a single string or list of strings)
             narration_script: The script for narration generation
         """
         turn = next((t for t in self.turns if t.turn_number == turn_number), None)

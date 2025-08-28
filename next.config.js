@@ -5,12 +5,26 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Handle media files in the public directory
+  // Handle API and media routes
   async rewrites() {
     return [
       {
+        source: '/api/:path*',
+        destination: 'http://localhost:8000/:path*',
+      },
+      {
         source: '/media/:path*',
         destination: '/media/:path*',
+      },
+    ];
+  },
+  // Redirect root to /simulation
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/simulation',
+        permanent: false,
       },
     ];
   },

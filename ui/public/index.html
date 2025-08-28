@@ -159,19 +159,19 @@
                 border-left: 5px solid var(--secondary-accent);
                 text-align: center;
             }
-            
+
             .grade-value {
                 font-size: 1.5em;
                 font-weight: bold;
                 color: var(--secondary-accent);
             }
-            
+
             .grade-explanation {
                 font-style: italic;
                 color: var(--text-color);
                 margin-top: 10px;
             }
-            
+
             .rationale-text {
                 font-style: italic;
                 color: var(--secondary-accent);
@@ -274,14 +274,14 @@
                 background-color: rgba(0, 0, 0, 0.3);
                 border-radius: 5px;
             }
-            
+
             .progress-item {
                 display: flex;
                 align-items: center;
                 color: #999;
                 font-size: 14px;
             }
-            
+
             .progress-icon {
                 display: inline-flex;
                 justify-content: center;
@@ -293,24 +293,24 @@
                 font-weight: bold;
                 background-color: #333;
             }
-            
+
             .progress-icon.complete {
                 background-color: #004400;
                 color: #00ff00;
             }
-            
+
             .progress-icon.pending {
                 color: #999;
             }
-            
+
             .progress-label {
                 flex-grow: 1;
             }
-            
+
             .progress-status {
                 font-size: 12px;
             }
-            
+
             .progress-status.complete {
                 color: #00ff00;
             }
@@ -507,21 +507,43 @@
 
             <div id="loading" class="loading" style="display: none">
                 <p>Loading simulation...</p>
-                <div class="generation-progress" style="margin-top: 15px;">
+                <div class="generation-progress" style="margin-top: 15px">
                     <div class="progress-item">
-                        <span class="progress-icon pending" id="scenario-progress-icon">...</span>
+                        <span
+                            class="progress-icon pending"
+                            id="scenario-progress-icon"
+                            >...</span
+                        >
                         <span class="progress-label">Scenario Generated</span>
-                        <span class="progress-status" id="scenario-progress-status">Pending</span>
+                        <span
+                            class="progress-status"
+                            id="scenario-progress-status"
+                            >Pending</span
+                        >
                     </div>
                     <div class="progress-item">
-                        <span class="progress-icon pending" id="videos-progress-icon">...</span>
+                        <span
+                            class="progress-icon pending"
+                            id="videos-progress-icon"
+                            >...</span
+                        >
                         <span class="progress-label">Videos Generated</span>
-                        <span class="progress-status" id="videos-progress-status">Pending</span>
+                        <span
+                            class="progress-status"
+                            id="videos-progress-status"
+                            >Pending</span
+                        >
                     </div>
                     <div class="progress-item">
-                        <span class="progress-icon pending" id="audio-progress-icon">...</span>
+                        <span
+                            class="progress-icon pending"
+                            id="audio-progress-icon"
+                            >...</span
+                        >
                         <span class="progress-label">Audio Generated</span>
-                        <span class="progress-status" id="audio-progress-status">Pending</span>
+                        <span class="progress-status" id="audio-progress-status"
+                            >Pending</span
+                        >
                     </div>
                 </div>
             </div>
@@ -541,7 +563,11 @@
                         <source src="" type="video/mp4" />
                         Your browser does not support the video tag.
                     </video>
-                    <video id="scenario-video-buffer" controls style="display: none">
+                    <video
+                        id="scenario-video-buffer"
+                        controls
+                        style="display: none"
+                    >
                         <source src="" type="video/mp4" />
                         Your browser does not support the video tag.
                     </video>
@@ -590,9 +616,8 @@
             let isAudioPlaying = false; // Tracks if audio is currently playing
 
             // Video player elements for preloading
-            const scenarioVideoElement = document.getElementById(
-                "scenario-video",
-            );
+            const scenarioVideoElement =
+                document.getElementById("scenario-video");
             const scenarioVideoBufferElement = document.getElementById(
                 "scenario-video-buffer",
             );
@@ -631,9 +656,15 @@
             developerModeToggle.addEventListener("click", toggleDeveloperMode);
 
             // Add error listeners for media elements
-            scenarioVideoElement.addEventListener('error', (e) => handleMediaError(e, 'scenarioVideoElement'));
-            scenarioVideoBufferElement.addEventListener('error', (e) => handleMediaError(e, 'scenarioVideoBufferElement'));
-            scenarioAudioElement.addEventListener('error', (e) => handleMediaError(e, 'scenarioAudioElement'));
+            scenarioVideoElement.addEventListener("error", (e) =>
+                handleMediaError(e, "scenarioVideoElement"),
+            );
+            scenarioVideoBufferElement.addEventListener("error", (e) =>
+                handleMediaError(e, "scenarioVideoBufferElement"),
+            );
+            scenarioAudioElement.addEventListener("error", (e) =>
+                handleMediaError(e, "scenarioAudioElement"),
+            );
 
             // Initialize custom properties
             scenarioVideoElement.isSwapping = false;
@@ -668,37 +699,41 @@
                 if (error) {
                     switch (error.code) {
                         case MediaError.MEDIA_ERR_ABORTED:
-                            errorMessage += 'Playback aborted by user or script.';
+                            errorMessage +=
+                                "Playback aborted by user or script.";
                             break;
                         case MediaError.MEDIA_ERR_NETWORK:
-                            errorMessage += 'Network error caused download to fail.';
+                            errorMessage +=
+                                "Network error caused download to fail.";
                             break;
                         case MediaError.MEDIA_ERR_DECODE:
-                            errorMessage += 'Media decoding error.';
+                            errorMessage += "Media decoding error.";
                             break;
                         case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                            errorMessage += 'Media source format not supported.';
+                            errorMessage +=
+                                "Media source format not supported.";
                             break;
                         default:
-                            errorMessage += 'An unknown error occurred.';
+                            errorMessage += "An unknown error occurred.";
                     }
                     errorMessage += ` (Code: ${error.code})`;
                     if (event.target.currentSrc) {
                         errorMessage += `\nSource: ${event.target.currentSrc}`;
                     }
                 } else {
-                     errorMessage += 'An unknown error occurred (no error object).';
+                    errorMessage +=
+                        "An unknown error occurred (no error object).";
                 }
-                 console.error(errorMessage, event);
-                 // Optionally show a user-facing error, but be mindful of cascading errors
-                 // showError(`Media playback error on ${elementName}. Please check console for details.`);
+                console.error(errorMessage, event);
+                // Optionally show a user-facing error, but be mindful of cascading errors
+                // showError(`Media playback error on ${elementName}. Please check console for details.`);
 
-                 // Attempt recovery? Maybe try reloading the source or skipping? For now, just log.
-                 // If it's the current player, maybe try swapping or stopping.
-                 if (player === currentPlayerElement) {
-                     // Stop playback if current player fails critically
-                     stopPlaybackAndAudio();
-                 }
+                // Attempt recovery? Maybe try reloading the source or skipping? For now, just log.
+                // If it's the current player, maybe try swapping or stopping.
+                if (player === currentPlayerElement) {
+                    // Stop playback if current player fails critically
+                    stopPlaybackAndAudio();
+                }
             }
 
             // Toggle developer mode
@@ -784,7 +819,9 @@
                             loadingElement.style.display = "none";
                         }, 1000); // Add a small delay to allow users to see final checkmarks
                     } else if (message.type === "progress_update") {
-                        console.log(`Progress update received for step: ${message.step}`);
+                        console.log(
+                            `Progress update received for step: ${message.step}`,
+                        );
                         if (message.step === "scenario_generated") {
                             markProgressComplete("scenario");
                         } else if (message.step === "videos_generated") {
@@ -799,7 +836,7 @@
                 wsConnection.onerror = (error) => {
                     console.error("WebSocket error:", error);
                     // Consider hiding loading on critical WebSocket errors if simulation cannot proceed
-                    // loadingElement.style.display = "none"; 
+                    // loadingElement.style.display = "none";
                 };
 
                 wsConnection.onclose = () => {
@@ -828,12 +865,12 @@
                 // Disable the start button and show loading state
                 startButton.disabled = true;
                 loadingElement.style.display = "block";
-                
+
                 // Reset progress indicators
                 resetProgressIndicators();
 
                 // Reset audio flags
-                hasAudioStarted = false; 
+                hasAudioStarted = false;
                 isAudioPlaying = false;
                 currentVideoPlaybackIndex = 0; // Reset for the new simulation
 
@@ -871,16 +908,17 @@
                     // Loading spinner will be hidden by WebSocket message handler too.
 
                     // Initial state updates (non-progress related) for the new simulation
-                    hasAudioStarted = false; 
+                    hasAudioStarted = false;
                     isAudioPlaying = false;
-                    currentVideoPlaybackIndex = 0; 
+                    currentVideoPlaybackIndex = 0;
                     actualUniqueUrlCount = 0;
                     currentPlayerElement = scenarioVideoElement;
                     bufferPlayerElement = scenarioVideoBufferElement;
                     currentPlayerElement.isSwapping = false; // Reset flag
                     bufferPlayerElement.isSwapping = false; // Reset flag
-                    console.log("[UI Update] Reset currentPlayerElement to scenarioVideoElement for new turn media.");
-
+                    console.log(
+                        "[UI Update] Reset currentPlayerElement to scenarioVideoElement for new turn media.",
+                    );
                 } catch (error) {
                     showError(`Failed to start simulation: ${error.message}`);
                     startButton.disabled = false;
@@ -892,10 +930,10 @@
             async function loadSimulation(id) {
                 // Show loading state
                 loadingElement.style.display = "block";
-                
+
                 // Stop any existing playback before loading
                 stopPlaybackAndAudio();
-                
+
                 // Reset progress indicators
                 resetProgressIndicators();
 
@@ -929,15 +967,17 @@
                     // Video/Audio progress will also be marked by WebSocket messages.
 
                     // Initial state updates (non-progress related) for the loaded simulation
-                    hasAudioStarted = false; 
+                    hasAudioStarted = false;
                     isAudioPlaying = false;
-                    currentVideoPlaybackIndex = 0; 
+                    currentVideoPlaybackIndex = 0;
                     actualUniqueUrlCount = 0;
                     currentPlayerElement = scenarioVideoElement;
                     bufferPlayerElement = scenarioVideoBufferElement;
                     currentPlayerElement.isSwapping = false; // Reset flag
                     bufferPlayerElement.isSwapping = false; // Reset flag
-                    console.log("[UI Update] Reset currentPlayerElement to scenarioVideoElement for new turn media.");
+                    console.log(
+                        "[UI Update] Reset currentPlayerElement to scenarioVideoElement for new turn media.",
+                    );
 
                     // The updateSimulationUI and hiding of loadingElement will be handled by WebSocket messages.
                 } catch (error) {
@@ -1042,10 +1082,10 @@
                 // Update scenario display
                 if (currentTurn && currentTurn.selected_scenario) {
                     // We no longer mark progress here as it's handled by delayed sequence above
-                    
+
                     // Stop any previous turn's media before updating UI
                     stopPlaybackAndAudio();
-                    
+
                     // Handle final turn differently (conclusion)
                     if (
                         simulation.current_turn_number === simulation.max_turns
@@ -1057,7 +1097,7 @@
                         <p>${currentTurn.selected_scenario.situation_description}</p>
                         <p class="rationale-text">${currentTurn.selected_scenario.rationale || ""}</p>
                         <div class="grade-display">
-                            <h4>Final Grade: <span class="grade-value">${currentTurn.selected_scenario.grade !== undefined ? currentTurn.selected_scenario.grade : 'N/A'}/100</span></h4>
+                            <h4>Final Grade: <span class="grade-value">${currentTurn.selected_scenario.grade !== undefined ? currentTurn.selected_scenario.grade : "N/A"}/100</span></h4>
                         </div>
                         ${developerMode ? `<pre class="debug-data" style="font-size: 10px; margin-top: 20px; padding: 10px; background: #222; border: 1px solid #555;">Scenario Data: ${JSON.stringify(currentTurn.selected_scenario, null, 2)}</pre>` : ""}
                     `;
@@ -1096,7 +1136,7 @@
                     console.log(
                         "[UI Update] Current turn object:",
                         JSON.parse(JSON.stringify(currentTurn)),
-                    ); 
+                    );
                     console.log(
                         "[UI Update] Checking currentTurn.video_urls:",
                         currentTurn.video_urls,
@@ -1114,7 +1154,7 @@
                         currentTurn.video_urls.length > 0
                     ) {
                         // Progress marking is now handled in the delayed sequence above
-                        
+
                         console.log(
                             "[UI Update] video_urls is a non-empty array. Processing...",
                         );
@@ -1126,8 +1166,13 @@
                         });
 
                         // Ensure we only use unique URLs for the two-pass playlist
-                        const actualUniqueUrls = [...new Set(processedUrlsFromTurn)];
-                        console.log("[UI Update] Actual unique URLs for playlist:", actualUniqueUrls);
+                        const actualUniqueUrls = [
+                            ...new Set(processedUrlsFromTurn),
+                        ];
+                        console.log(
+                            "[UI Update] Actual unique URLs for playlist:",
+                            actualUniqueUrls,
+                        );
 
                         // Create the playlist: just use the unique sequence without repeating
                         currentVideoPlaylist = [...actualUniqueUrls];
@@ -1143,24 +1188,36 @@
                             console.log(
                                 "[UI Update] Playlist has videos. Initializing playback setup.",
                             );
-                             // Ensure players are reset and hidden initially
+                            // Ensure players are reset and hidden initially
                             currentPlayerElement.style.display = "none";
                             bufferPlayerElement.style.display = "none";
-                            currentPlayerElement.querySelector("source").src = ""; // Clear source
-                            bufferPlayerElement.querySelector("source").src = ""; // Clear source
+                            currentPlayerElement.querySelector("source").src =
+                                ""; // Clear source
+                            bufferPlayerElement.querySelector("source").src =
+                                ""; // Clear source
                             currentPlayerElement.load(); // Reset state
                             bufferPlayerElement.load(); // Reset state
                             isBufferVideoReady = false; // Reset buffer flag
 
                             // Load the first video into the primary player, but don't play yet
-                            console.log(`[UI Update] Preloading first video (${currentVideoPlaylist[0]}) into ${currentPlayerElement.id}`);
-                            loadVideoIntoPlayer(currentPlayerElement, currentVideoPlaylist[0]);
+                            console.log(
+                                `[UI Update] Preloading first video (${currentVideoPlaylist[0]}) into ${currentPlayerElement.id}`,
+                            );
+                            loadVideoIntoPlayer(
+                                currentPlayerElement,
+                                currentVideoPlaylist[0],
+                            );
                             currentPlayerElement.style.display = "block"; // Make it visible for user interaction
 
                             // Preload the second video (if exists) into the buffer player
                             if (currentVideoPlaylist.length > 1) {
-                                console.log(`[UI Update] Preloading second video (${currentVideoPlaylist[1]}) into ${bufferPlayerElement.id}`);
-                                loadVideoIntoPlayer(bufferPlayerElement, currentVideoPlaylist[1]);
+                                console.log(
+                                    `[UI Update] Preloading second video (${currentVideoPlaylist[1]}) into ${bufferPlayerElement.id}`,
+                                );
+                                loadVideoIntoPlayer(
+                                    bufferPlayerElement,
+                                    currentVideoPlaylist[1],
+                                );
                             }
                         } else {
                             console.log(
@@ -1171,7 +1228,7 @@
                         }
                     } else {
                         // Progress marking is now handled in the delayed sequence above
-                        
+
                         console.log(
                             "[UI Update] video_urls is NOT a valid non-empty array. Hiding video player.",
                         );
@@ -1197,8 +1254,11 @@
 
                     if (currentTurn.audio_url) {
                         // Progress marking is now handled in the delayed sequence above
-                        
-                        console.log("[UI Update] Received audio_url:", currentTurn.audio_url);
+
+                        console.log(
+                            "[UI Update] Received audio_url:",
+                            currentTurn.audio_url,
+                        );
                         scenarioAudioElement.querySelector("source").src =
                             currentTurn.audio_url;
                         scenarioAudioElement.load();
@@ -1208,8 +1268,10 @@
                         isAudioPlaying = false;
                     } else {
                         // Progress marking is now handled in the delayed sequence above
-                        
-                        console.log("[UI Update] No audio_url received for this turn.");
+
+                        console.log(
+                            "[UI Update] No audio_url received for this turn.",
+                        );
                         scenarioAudioElement.querySelector("source").src = "";
                         scenarioAudioElement.load();
                         // scenarioAudioElement.style.display = "none"; // Already default or handled by CSS if we add it
@@ -1307,64 +1369,89 @@
                 // ... old implementation ...
             }
             */
-            
+
             function loadVideoIntoPlayer(playerElement, videoUrl) {
                 if (!playerElement || !videoUrl) {
-                     console.warn("loadVideoIntoPlayer: Invalid player or URL.", playerElement, videoUrl);
-                     return;
-                 }
+                    console.warn(
+                        "loadVideoIntoPlayer: Invalid player or URL.",
+                        playerElement,
+                        videoUrl,
+                    );
+                    return;
+                }
 
-                console.log(`[LoadVideo] Attempting to load ${videoUrl} into ${playerElement.id}`);
-                
+                console.log(
+                    `[LoadVideo] Attempting to load ${videoUrl} into ${playerElement.id}`,
+                );
+
                 // Reset swapping flag for the player being loaded
                 playerElement.isSwapping = false;
-                
+
                 // Remove *all* previous listeners to prevent duplicates or leaks
                 // Store current time if needed (though usually we start fresh)
-                // const currentTime = playerElement.currentTime; 
-                
+                // const currentTime = playerElement.currentTime;
+
                 // Remove specific listeners if added elsewhere, or use a more robust cleanup
                 playerElement.oncanplay = null;
                 playerElement.oncanplaythrough = null; // Add this one too
                 playerElement.onloadeddata = null; // If using this
                 playerElement.onerror = null; // Re-add general error handler later if needed
 
-                 // Re-attach the general media error handler
-                playerElement.onerror = (e) => handleMediaError(e, playerElement.id);
-                
+                // Re-attach the general media error handler
+                playerElement.onerror = (e) =>
+                    handleMediaError(e, playerElement.id);
+
                 playerElement.querySelector("source").src = videoUrl;
                 playerElement.load(); // Important: load the new source
 
                 // Use 'canplaythrough' for the buffer player to ensure it's more fully loaded
                 // Use 'canplay' for the current player as we want it to be ready sooner
                 if (playerElement === bufferPlayerElement) {
-                    playerElement.oncanplaythrough = function() {
+                    playerElement.oncanplaythrough = function () {
                         // Check if this is still the intended buffer video (race condition prevention)
-                         if (playerElement.currentSrc.endsWith(videoUrl)) {
+                        if (playerElement.currentSrc.endsWith(videoUrl)) {
                             isBufferVideoReady = true;
-                            console.log(`[LoadVideo] Buffer video (${videoUrl}) can play through (readyState: ${playerElement.readyState}).`);
-                         } else {
-                             console.warn(`[LoadVideo] Buffer 'canplaythrough' event for wrong video? Expected ${videoUrl}, got ${playerElement.currentSrc}`);
-                         }
+                            console.log(
+                                `[LoadVideo] Buffer video (${videoUrl}) can play through (readyState: ${playerElement.readyState}).`,
+                            );
+                        } else {
+                            console.warn(
+                                `[LoadVideo] Buffer 'canplaythrough' event for wrong video? Expected ${videoUrl}, got ${playerElement.currentSrc}`,
+                            );
+                        }
                     };
                     // Fallback or additional check with 'canplay' if 'canplaythrough' takes too long? Maybe not needed.
-                } else { // currentPlayerElement
-                    playerElement.oncanplay = function() {
-                         // Check if this is still the intended current video
-                         if (playerElement.currentSrc.endsWith(videoUrl)) {
-                            console.log(`[LoadVideo] Current video (${videoUrl}) can play (readyState: ${playerElement.readyState}).`);
+                } else {
+                    // currentPlayerElement
+                    playerElement.oncanplay = function () {
+                        // Check if this is still the intended current video
+                        if (playerElement.currentSrc.endsWith(videoUrl)) {
+                            console.log(
+                                `[LoadVideo] Current video (${videoUrl}) can play (readyState: ${playerElement.readyState}).`,
+                            );
                             // If this is a subsequent video in the sequence AND audio is playing, start it
-                            if (currentVideoPlaybackIndex > 0 && hasAudioStarted && isAudioPlaying && playerElement.paused) {
-                                 console.log(`[LoadVideo] Auto-playing subsequent video ${playerElement.id} via oncanplay.`);
-                                 attemptPlayVideo(playerElement);
+                            if (
+                                currentVideoPlaybackIndex > 0 &&
+                                hasAudioStarted &&
+                                isAudioPlaying &&
+                                playerElement.paused
+                            ) {
+                                console.log(
+                                    `[LoadVideo] Auto-playing subsequent video ${playerElement.id} via oncanplay.`,
+                                );
+                                attemptPlayVideo(playerElement);
                             }
                         } else {
-                             console.warn(`[LoadVideo] Current 'canplay' event for wrong video? Expected ${videoUrl}, got ${playerElement.currentSrc}`);
+                            console.warn(
+                                `[LoadVideo] Current 'canplay' event for wrong video? Expected ${videoUrl}, got ${playerElement.currentSrc}`,
+                            );
                         }
                     };
                 }
-                
-                console.log(`[LoadVideo] ${videoUrl} source set for ${playerElement.id}. Waiting for ready events.`);
+
+                console.log(
+                    `[LoadVideo] ${videoUrl} source set for ${playerElement.id}. Waiting for ready events.`,
+                );
             }
 
             // Removed - logic integrated into event listeners and swap function
@@ -1375,36 +1462,47 @@
             */
 
             function handleVideoEndAndSwap() {
-                console.log(`[Swap] Video in ${currentPlayerElement.id} ended. Index: ${currentVideoPlaybackIndex}. Buffer ready: ${isBufferVideoReady}`);
-                
+                console.log(
+                    `[Swap] Video in ${currentPlayerElement.id} ended. Index: ${currentVideoPlaybackIndex}. Buffer ready: ${isBufferVideoReady}`,
+                );
+
                 if (currentVideoPlaylist.length <= 1) {
-                    console.log("[Swap] Only one video or empty playlist, stopping.");
+                    console.log(
+                        "[Swap] Only one video or empty playlist, stopping.",
+                    );
                     // If only one video, just pause it. Audio ending will handle stopping.
-                     if (!currentPlayerElement.paused) currentPlayerElement.pause();
-                     // If audio should also stop here (e.g., loop requested only if multiple videos)
-                     // stopPlaybackAndAudio(); // Uncomment if audio should stop with single video end
+                    if (!currentPlayerElement.paused)
+                        currentPlayerElement.pause();
+                    // If audio should also stop here (e.g., loop requested only if multiple videos)
+                    // stopPlaybackAndAudio(); // Uncomment if audio should stop with single video end
                     return;
                 }
 
                 // Only proceed if the buffer video is ready
                 if (!isBufferVideoReady) {
-                    console.log("[Swap] Buffer video not ready yet, waiting...");
+                    console.log(
+                        "[Swap] Buffer video not ready yet, waiting...",
+                    );
                     // Re-check shortly. Avoid indefinite loops. Add a counter?
                     // For now, just try again once. If still not ready, playback might stall.
                     setTimeout(() => {
                         if (isBufferVideoReady) {
-                             console.log("[Swap] Buffer video ready after short wait. Performing swap.");
-                             performSwap();
+                            console.log(
+                                "[Swap] Buffer video ready after short wait. Performing swap.",
+                            );
+                            performSwap();
                         } else {
-                             console.warn("[Swap] Buffer video still not ready after wait. Playback may stall.");
-                             // Maybe try loading the buffer again? Or just stop?
-                             // For now, we stop to avoid unpredictable behavior.
-                             stopPlaybackAndAudio();
+                            console.warn(
+                                "[Swap] Buffer video still not ready after wait. Playback may stall.",
+                            );
+                            // Maybe try loading the buffer again? Or just stop?
+                            // For now, we stop to avoid unpredictable behavior.
+                            stopPlaybackAndAudio();
                         }
                     }, 100); // Increased wait time slightly
                     return;
                 }
-                
+
                 // Buffer is ready, proceed with the swap
                 performSwap();
             }
@@ -1420,28 +1518,36 @@
             // Function to perform the actual swap once buffer is ready
             function performSwap() {
                 // Increment index and wrap around for loop
-                currentVideoPlaybackIndex = (currentVideoPlaybackIndex + 1) % currentVideoPlaylist.length;
-                console.log(`[Swap] Swapping players. New index: ${currentVideoPlaybackIndex}`);
-                
+                currentVideoPlaybackIndex =
+                    (currentVideoPlaybackIndex + 1) %
+                    currentVideoPlaylist.length;
+                console.log(
+                    `[Swap] Swapping players. New index: ${currentVideoPlaybackIndex}`,
+                );
+
                 // Swap player roles
                 let temp = currentPlayerElement;
                 currentPlayerElement = bufferPlayerElement;
                 bufferPlayerElement = temp;
-                
+
                 // Update visibility: Make new current player visible, hide the new buffer player
-                currentPlayerElement.style.display = "block"; 
-                bufferPlayerElement.style.display = "none"; 
-                
+                currentPlayerElement.style.display = "block";
+                bufferPlayerElement.style.display = "none";
+
                 // Play the new current player immediately
                 // Ensure audio is synced ONLY if audio is supposed to be playing
-                 console.log(`[Swap] Attempting to play new current player: ${currentPlayerElement.id}. Audio should be playing: ${!scenarioAudioElement.ended}`);
+                console.log(
+                    `[Swap] Attempting to play new current player: ${currentPlayerElement.id}. Audio should be playing: ${!scenarioAudioElement.ended}`,
+                );
                 // We attempt to play regardless of the isAudioPlaying flag here,
                 // because the decision to swap was already based on the audio *not* being ended.
                 // syncAudioPlay (triggered by onplay) will handle audio state.
                 attemptPlayVideo(currentPlayerElement);
-                
+
                 // Start preloading the *next* video into the (now hidden) buffer player
-                const nextVideoIndex = (currentVideoPlaybackIndex + 1) % currentVideoPlaylist.length;
+                const nextVideoIndex =
+                    (currentVideoPlaybackIndex + 1) %
+                    currentVideoPlaylist.length;
                 const nextVideoUrl = currentVideoPlaylist[nextVideoIndex];
                 console.log(
                     `[Swap] Preloading next video (index ${nextVideoIndex}, URL: ${nextVideoUrl}) into buffer player (${bufferPlayerElement.id})`,
@@ -1461,61 +1567,89 @@
             */
 
             // Universal 'ended' event listener for both video players
-            [scenarioVideoElement, scenarioVideoBufferElement].forEach(player => {
-                 // Remove previous listener first if script re-runs
-                 // player.removeEventListener("ended", specificEndedHandler); // Need named handler or other mechanism
-                 player.addEventListener("ended", function() { // Use function to get correct 'this'
-                    // Only act if the event is from the currentPlayerElement and not already swapping
-                    if (this === currentPlayerElement && !this.isSwapping) {
-                        console.log(`[Event] 'ended' fallback triggered on current player ${this.id}.`);
-                        handleAnticipatedVideoEnd.call(this); // Call the handler with correct context
-                    } else if (this === currentPlayerElement && this.isSwapping) {
-                        console.log(`[Event] 'ended' ignored on ${this.id} because swap is already in progress.`);
-                    }
-                 });
+            [scenarioVideoElement, scenarioVideoBufferElement].forEach(
+                (player) => {
+                    // Remove previous listener first if script re-runs
+                    // player.removeEventListener("ended", specificEndedHandler); // Need named handler or other mechanism
+                    player.addEventListener("ended", function () {
+                        // Use function to get correct 'this'
+                        // Only act if the event is from the currentPlayerElement and not already swapping
+                        if (this === currentPlayerElement && !this.isSwapping) {
+                            console.log(
+                                `[Event] 'ended' fallback triggered on current player ${this.id}.`,
+                            );
+                            handleAnticipatedVideoEnd.call(this); // Call the handler with correct context
+                        } else if (
+                            this === currentPlayerElement &&
+                            this.isSwapping
+                        ) {
+                            console.log(
+                                `[Event] 'ended' ignored on ${this.id} because swap is already in progress.`,
+                            );
+                        }
+                    });
 
-                 // --- NEW Timeupdate Listener ---
-                 const ANTICIPATION_TIME = 0.5; // Seconds before the end to trigger swap
-                 player.addEventListener("timeupdate", function() { // Use function to get correct 'this'
-                     // Only act if the event is from the currentPlayerElement, not already swapping, and close to the end
-                     if (this === currentPlayerElement &&
-                         !this.isSwapping &&
-                         this.duration > 0 &&
-                         (this.duration - this.currentTime) <= ANTICIPATION_TIME)
-                     {
-                         console.log(`[Event] 'timeupdate' anticipation triggered on current player ${this.id} at ${this.currentTime}/${this.duration}.`);
-                         handleAnticipatedVideoEnd.call(this); // Call the handler with correct context
-                    }
-                });
-            });
+                    // --- NEW Timeupdate Listener ---
+                    const ANTICIPATION_TIME = 0.5; // Seconds before the end to trigger swap
+                    player.addEventListener("timeupdate", function () {
+                        // Use function to get correct 'this'
+                        // Only act if the event is from the currentPlayerElement, not already swapping, and close to the end
+                        if (
+                            this === currentPlayerElement &&
+                            !this.isSwapping &&
+                            this.duration > 0 &&
+                            this.duration - this.currentTime <=
+                                ANTICIPATION_TIME
+                        ) {
+                            console.log(
+                                `[Event] 'timeupdate' anticipation triggered on current player ${this.id} at ${this.currentTime}/${this.duration}.`,
+                            );
+                            handleAnticipatedVideoEnd.call(this); // Call the handler with correct context
+                        }
+                    });
+                },
+            );
 
             // --- NEW Handler for Swap Trigger ---
             function handleAnticipatedVideoEnd() {
                 // 'this' refers to the video element that triggered the event (currentPlayerElement)
                 if (this.isSwapping) {
-                     console.log(`[Anticipate] Swap already in progress for ${this.id}. Ignoring trigger.`);
-                     return; // Avoid redundant swaps
-                 }
+                    console.log(
+                        `[Anticipate] Swap already in progress for ${this.id}. Ignoring trigger.`,
+                    );
+                    return; // Avoid redundant swaps
+                }
 
-                console.log(`[Anticipate] Handling end/anticipation for ${this.id}. Audio ended: ${scenarioAudioElement.ended}`);
+                console.log(
+                    `[Anticipate] Handling end/anticipation for ${this.id}. Audio ended: ${scenarioAudioElement.ended}`,
+                );
 
                 // Check if audio has finished - if so, stop everything
-                if (scenarioAudioElement.ended || !scenarioAudioElement.currentSrc) {
-                    console.log(`[Anticipate] Audio ended or no source. Stopping playback.`);
+                if (
+                    scenarioAudioElement.ended ||
+                    !scenarioAudioElement.currentSrc
+                ) {
+                    console.log(
+                        `[Anticipate] Audio ended or no source. Stopping playback.`,
+                    );
                     stopPlaybackAndAudio();
                     return;
                 }
 
                 // Check if there are multiple videos to swap between
                 if (currentVideoPlaylist.length <= 1) {
-                    console.log("[Anticipate] Only one video or empty playlist, stopping.");
+                    console.log(
+                        "[Anticipate] Only one video or empty playlist, stopping.",
+                    );
                     stopPlaybackAndAudio(); // Stop if only one video finishes or audio ends
                     return;
                 }
 
                 // Mark that a swap is now in progress for *this* video element
                 this.isSwapping = true;
-                console.log(`[Anticipate] Setting isSwapping=true for ${this.id}`);
+                console.log(
+                    `[Anticipate] Setting isSwapping=true for ${this.id}`,
+                );
 
                 // Proceed to check the buffer and potentially swap
                 checkBufferAndSwap();
@@ -1523,11 +1657,15 @@
 
             // --- REFACTORED from handleVideoEndAndSwap ---
             function checkBufferAndSwap() {
-                console.log(`[CheckSwap] Checking buffer readiness. Index: ${currentVideoPlaybackIndex}. Buffer ready: ${isBufferVideoReady}`);
+                console.log(
+                    `[CheckSwap] Checking buffer readiness. Index: ${currentVideoPlaybackIndex}. Buffer ready: ${isBufferVideoReady}`,
+                );
 
                 // Only proceed if the buffer video is ready
                 if (!isBufferVideoReady) {
-                    console.warn("[CheckSwap] Buffer video not ready yet! Playback might stutter.");
+                    console.warn(
+                        "[CheckSwap] Buffer video not ready yet! Playback might stutter.",
+                    );
                     // Attempting swap anyway, browser might catch up.
                     // If this happens frequently, ANTICIPATION_TIME might be too short,
                     // or network/video files are problematic.
@@ -1539,7 +1677,9 @@
                 }
 
                 // Buffer is ready (or we're proceeding anyway), perform the swap
-                 console.log("[CheckSwap] Buffer ready or forcing swap. Performing swap.");
+                console.log(
+                    "[CheckSwap] Buffer ready or forcing swap. Performing swap.",
+                );
                 performSwap();
             }
 
@@ -1559,44 +1699,63 @@
                  console.log("Reset swapping flags.");
             }
             */
-            
-            function attemptPlayVideo(videoElementToPlay) {
-                 // Only play if the source is valid
-                 if (!videoElementToPlay || !videoElementToPlay.currentSrc) {
-                     console.warn("[PlayAttempt] Cannot play, invalid element or source.", videoElementToPlay);
-                     return;
-                 }
-                 // Don't try to play if already playing
-                 if (!videoElementToPlay.paused) {
-                     console.log(`[PlayAttempt] Video ${videoElementToPlay.id} is already playing.`);
-                     return;
-                 }
 
-                 console.log(`[PlayAttempt] Attempting to play video ${videoElementToPlay.id}`);
+            function attemptPlayVideo(videoElementToPlay) {
+                // Only play if the source is valid
+                if (!videoElementToPlay || !videoElementToPlay.currentSrc) {
+                    console.warn(
+                        "[PlayAttempt] Cannot play, invalid element or source.",
+                        videoElementToPlay,
+                    );
+                    return;
+                }
+                // Don't try to play if already playing
+                if (!videoElementToPlay.paused) {
+                    console.log(
+                        `[PlayAttempt] Video ${videoElementToPlay.id} is already playing.`,
+                    );
+                    return;
+                }
+
+                console.log(
+                    `[PlayAttempt] Attempting to play video ${videoElementToPlay.id}`,
+                );
                 const playPromise = videoElementToPlay.play();
                 if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log(`[PlayAttempt] Video ${videoElementToPlay.id} started playing successfully.`);
-                         // syncAudioPlay will be called via the 'onplay' event handler
-                    }).catch(error => {
-                        console.error(`[PlayAttempt] Error trying to play video ${videoElementToPlay.id}:`, error);
-                         // Common issue: User hasn't interacted yet.
-                         if (error.name === 'NotAllowedError') {
-                             showError("Playback requires user interaction. Click play on the video.");
-                             // Ensure audio hasn't sneakily started
-                             if (!scenarioAudioElement.paused) scenarioAudioElement.pause();
-                             isAudioPlaying = false;
-                         } else {
-                             showError(`Error playing video: ${error.message}`);
-                         }
-                         // Stop everything if play fails critically
-                         stopPlaybackAndAudio();
-                    });
+                    playPromise
+                        .then(() => {
+                            console.log(
+                                `[PlayAttempt] Video ${videoElementToPlay.id} started playing successfully.`,
+                            );
+                            // syncAudioPlay will be called via the 'onplay' event handler
+                        })
+                        .catch((error) => {
+                            console.error(
+                                `[PlayAttempt] Error trying to play video ${videoElementToPlay.id}:`,
+                                error,
+                            );
+                            // Common issue: User hasn't interacted yet.
+                            if (error.name === "NotAllowedError") {
+                                showError(
+                                    "Playback requires user interaction. Click play on the video.",
+                                );
+                                // Ensure audio hasn't sneakily started
+                                if (!scenarioAudioElement.paused)
+                                    scenarioAudioElement.pause();
+                                isAudioPlaying = false;
+                            } else {
+                                showError(
+                                    `Error playing video: ${error.message}`,
+                                );
+                            }
+                            // Stop everything if play fails critically
+                            stopPlaybackAndAudio();
+                        });
                 }
             }
 
             // Removed - Integrated into loadVideoIntoPlayer
-             /*
+            /*
              // Universal 'canplay' event listener
              [scenarioVideoElement, scenarioVideoBufferElement].forEach(player => {
                 player.addEventListener("canplay", () => {
@@ -1604,62 +1763,89 @@
                 });
             });
             */
-            
+
             // Synchronization logic refinement
             function syncAudioPlay() {
                 // This function is triggered by the video's 'onplay' event.
-                 if (isSeeking) return; // Don't sync during seek operation
+                if (isSeeking) return; // Don't sync during seek operation
 
                 console.log(
-                    `[Sync] Video 'onplay' triggered on ${currentPlayerElement.id}. hasAudioStarted: ${hasAudioStarted}, isAudioPlaying: ${isAudioPlaying}, audioSrc: ${!!scenarioAudioElement.currentSrc}`
+                    `[Sync] Video 'onplay' triggered on ${currentPlayerElement.id}. hasAudioStarted: ${hasAudioStarted}, isAudioPlaying: ${isAudioPlaying}, audioSrc: ${!!scenarioAudioElement.currentSrc}`,
                 );
-                 
-                 // Check if audio should be playing
-                 if (scenarioAudioElement.currentSrc) {
+
+                // Check if audio should be playing
+                if (scenarioAudioElement.currentSrc) {
                     if (!hasAudioStarted) {
                         // First time video plays (initiated by user click or auto-play after swap)
                         // This means it's the first play for THIS audio track in the current turn.
-                        console.log("[Sync] Starting audio for the first time for this track.");
-                         scenarioAudioElement.currentTime = 0; // Start this audio track from its beginning.
-                        scenarioAudioElement.play().then(() => {
-                            hasAudioStarted = true;
-                            isAudioPlaying = true;
-                            console.log("[Sync] Audio started successfully (first time for track).");
-                        }).catch(e => {
-                             console.error("[Sync] Error starting audio (first time for track):", e);
-                             stopPlaybackAndAudio();
-                             showError("Could not start audio playback.");
-                         });
+                        console.log(
+                            "[Sync] Starting audio for the first time for this track.",
+                        );
+                        scenarioAudioElement.currentTime = 0; // Start this audio track from its beginning.
+                        scenarioAudioElement
+                            .play()
+                            .then(() => {
+                                hasAudioStarted = true;
+                                isAudioPlaying = true;
+                                console.log(
+                                    "[Sync] Audio started successfully (first time for track).",
+                                );
+                            })
+                            .catch((e) => {
+                                console.error(
+                                    "[Sync] Error starting audio (first time for track):",
+                                    e,
+                                );
+                                stopPlaybackAndAudio();
+                                showError("Could not start audio playback.");
+                            });
                     } else if (scenarioAudioElement.paused) {
                         // Video was played (e.g., after pause or swap) and audio was paused, resume audio.
                         // Audio has been started before for this track, but is currently paused.
                         console.log("[Sync] Resuming paused audio.");
-                         // DON'T set currentTime here. Let it resume from where it was paused.
-                        scenarioAudioElement.play().then(() => {
-                            isAudioPlaying = true; // Audio is now playing
-                            console.log("[Sync] Audio resumed successfully.");
-                        }).catch(e => {
-                            console.error("[Sync] Error resuming audio:", e);
-                             stopPlaybackAndAudio();
-                             showError("Could not resume audio playback.");
-                         });
+                        // DON'T set currentTime here. Let it resume from where it was paused.
+                        scenarioAudioElement
+                            .play()
+                            .then(() => {
+                                isAudioPlaying = true; // Audio is now playing
+                                console.log(
+                                    "[Sync] Audio resumed successfully.",
+                                );
+                            })
+                            .catch((e) => {
+                                console.error(
+                                    "[Sync] Error resuming audio:",
+                                    e,
+                                );
+                                stopPlaybackAndAudio();
+                                showError("Could not resume audio playback.");
+                            });
                     } else {
-                         // Audio has started and is not paused. Video is playing.
-                         // This means audio should already be playing. No action needed regarding currentTime.
-                         // Ensure isAudioPlaying is true, as video play implies audio should be active.
-                         isAudioPlaying = true; 
-                         console.log("[Sync] Audio is already started and not paused. Video playing.");
+                        // Audio has started and is not paused. Video is playing.
+                        // This means audio should already be playing. No action needed regarding currentTime.
+                        // Ensure isAudioPlaying is true, as video play implies audio should be active.
+                        isAudioPlaying = true;
+                        console.log(
+                            "[Sync] Audio is already started and not paused. Video playing.",
+                        );
                     }
                 } else {
-                    console.log("[Sync] No audio source, video playing independently.");
+                    console.log(
+                        "[Sync] No audio source, video playing independently.",
+                    );
                 }
             }
-            
-            function syncAudioPause() {
-                 if (isSeeking) return; // Don't sync during seek operation
 
-                 // This function is triggered by the video's 'onpause' event.
-                 if (scenarioAudioElement.currentSrc && !scenarioAudioElement.paused && currentPlayerElement && currentPlayerElement.paused) {
+            function syncAudioPause() {
+                if (isSeeking) return; // Don't sync during seek operation
+
+                // This function is triggered by the video's 'onpause' event.
+                if (
+                    scenarioAudioElement.currentSrc &&
+                    !scenarioAudioElement.paused &&
+                    currentPlayerElement &&
+                    currentPlayerElement.paused
+                ) {
                     console.log("[Sync] Video pause detected, pausing audio.");
                     scenarioAudioElement.pause();
                     isAudioPlaying = false; // Audio is now paused
@@ -1667,73 +1853,104 @@
             }
 
             // Add 'seeking' and 'seeked' listeners to manage the isSeeking flag
-            function handleVideoSeeking(videoElement) { // Accept videoElement as parameter
+            function handleVideoSeeking(videoElement) {
+                // Accept videoElement as parameter
                 if (videoElement === currentPlayerElement) {
                     isSeeking = true;
                     console.log("[Sync] Video seeking started.");
                     // Optionally pause audio during seek?
                     // if (!scenarioAudioElement.paused) scenarioAudioElement.pause();
-                 }
+                }
             }
 
-            function handleVideoSeeked(videoElement) { // Accept videoElement as parameter
+            function handleVideoSeeked(videoElement) {
+                // Accept videoElement as parameter
                 if (videoElement === currentPlayerElement) {
                     console.log("[Sync] Video seeking finished.");
                     if (scenarioAudioElement.currentSrc && hasAudioStarted) {
-                        console.log(`[Sync] Video seeked. Current video time: ${videoElement.currentTime}. Audio continues from: ${scenarioAudioElement.currentTime}`);
+                        console.log(
+                            `[Sync] Video seeked. Current video time: ${videoElement.currentTime}. Audio continues from: ${scenarioAudioElement.currentTime}`,
+                        );
                         // DO NOT sync audio time to video time after seek.
                         // scenarioAudioElement.currentTime = videoElement.currentTime; // REMOVED THIS LINE
 
                         // If video is playing after seek, ensure audio plays too
-                        if (!videoElement.paused && scenarioAudioElement.paused) {
-                            console.log("[Sync] Resuming audio after seek (video is playing).");
-                             scenarioAudioElement.play().then(() => isAudioPlaying = true).catch(e => console.error("Error resuming audio post-seek:", e));
-                        } else if (videoElement.paused && !scenarioAudioElement.paused) {
-                             // If video is paused after seek, pause audio too
-                             console.log("[Sync] Pausing audio after seek (video is paused).");
-                             scenarioAudioElement.pause();
-                             isAudioPlaying = false;
+                        if (
+                            !videoElement.paused &&
+                            scenarioAudioElement.paused
+                        ) {
+                            console.log(
+                                "[Sync] Resuming audio after seek (video is playing).",
+                            );
+                            scenarioAudioElement
+                                .play()
+                                .then(() => (isAudioPlaying = true))
+                                .catch((e) =>
+                                    console.error(
+                                        "Error resuming audio post-seek:",
+                                        e,
+                                    ),
+                                );
+                        } else if (
+                            videoElement.paused &&
+                            !scenarioAudioElement.paused
+                        ) {
+                            // If video is paused after seek, pause audio too
+                            console.log(
+                                "[Sync] Pausing audio after seek (video is paused).",
+                            );
+                            scenarioAudioElement.pause();
+                            isAudioPlaying = false;
                         }
                     }
                     // Crucially, reset the flag *after* adjustments
-                     setTimeout(() => { isSeeking = false; }, 50); // Small delay before resetting flag
-                 }
+                    setTimeout(() => {
+                        isSeeking = false;
+                    }, 50); // Small delay before resetting flag
+                }
             }
 
+            [scenarioVideoElement, scenarioVideoBufferElement].forEach(
+                (player) => {
+                    // Remove old listeners if script re-runs
+                    // player.removeEventListener('play', ...)
+                    // ... etc
 
-            [scenarioVideoElement, scenarioVideoBufferElement].forEach(player => {
-                // Remove old listeners if script re-runs
-                // player.removeEventListener('play', ...)
-                // ... etc
-                
-                player.onplay = function() { // 'this' is the player
-                    if (this === currentPlayerElement) syncAudioPlay(); 
-                };
-                player.onpause = function() { // 'this' is the player
-                    if (this === currentPlayerElement) syncAudioPause(); 
-                };
-                player.onseeking = function() { // 'this' is the player
-                    handleVideoSeeking(this); // Pass 'this' (the player element)
-                };
-                player.onseeked = function() { // 'this' is the player
-                    handleVideoSeeked(this); // Pass 'this' (the player element)
-                };
-            });
+                    player.onplay = function () {
+                        // 'this' is the player
+                        if (this === currentPlayerElement) syncAudioPlay();
+                    };
+                    player.onpause = function () {
+                        // 'this' is the player
+                        if (this === currentPlayerElement) syncAudioPause();
+                    };
+                    player.onseeking = function () {
+                        // 'this' is the player
+                        handleVideoSeeking(this); // Pass 'this' (the player element)
+                    };
+                    player.onseeked = function () {
+                        // 'this' is the player
+                        handleVideoSeeked(this); // Pass 'this' (the player element)
+                    };
+                },
+            );
 
             // Handle audio ending - it should stop video playback
             scenarioAudioElement.onended = () => {
                 console.log("[Sync] Audio track has ended.");
                 isAudioPlaying = false;
                 // hasAudioStarted remains true
-                
+
                 // Pause the current video when audio ends
                 if (currentPlayerElement && !currentPlayerElement.paused) {
-                    console.log("[Sync] Pausing current video because audio ended.");
+                    console.log(
+                        "[Sync] Pausing current video because audio ended.",
+                    );
                     currentPlayerElement.pause();
                 }
                 // Ensure buffer is also paused if it somehow got playing
                 if (bufferPlayerElement && !bufferPlayerElement.paused) {
-                     bufferPlayerElement.pause();
+                    bufferPlayerElement.pause();
                 }
             };
             // --- END NEW FUNCTIONS AND EVENT LISTENERS ---
@@ -1891,58 +2108,89 @@
             function resetProgressIndicators() {
                 console.log("Resetting progress indicators");
                 // Reset scenario progress
-                document.getElementById("scenario-progress-icon").textContent = "...";
-                document.getElementById("scenario-progress-icon").classList.remove("complete");
-                document.getElementById("scenario-progress-icon").classList.add("pending");
-                document.getElementById("scenario-progress-status").textContent = "Pending";
-                document.getElementById("scenario-progress-status").classList.remove("complete");
-                
+                document.getElementById("scenario-progress-icon").textContent =
+                    "...";
+                document
+                    .getElementById("scenario-progress-icon")
+                    .classList.remove("complete");
+                document
+                    .getElementById("scenario-progress-icon")
+                    .classList.add("pending");
+                document.getElementById(
+                    "scenario-progress-status",
+                ).textContent = "Pending";
+                document
+                    .getElementById("scenario-progress-status")
+                    .classList.remove("complete");
+
                 // Reset videos progress
-                document.getElementById("videos-progress-icon").textContent = "...";
-                document.getElementById("videos-progress-icon").classList.remove("complete");
-                document.getElementById("videos-progress-icon").classList.add("pending");
-                document.getElementById("videos-progress-status").textContent = "Pending";
-                document.getElementById("videos-progress-status").classList.remove("complete");
-                
+                document.getElementById("videos-progress-icon").textContent =
+                    "...";
+                document
+                    .getElementById("videos-progress-icon")
+                    .classList.remove("complete");
+                document
+                    .getElementById("videos-progress-icon")
+                    .classList.add("pending");
+                document.getElementById("videos-progress-status").textContent =
+                    "Pending";
+                document
+                    .getElementById("videos-progress-status")
+                    .classList.remove("complete");
+
                 // Reset audio progress
-                document.getElementById("audio-progress-icon").textContent = "...";
-                document.getElementById("audio-progress-icon").classList.remove("complete");
-                document.getElementById("audio-progress-icon").classList.add("pending");
-                document.getElementById("audio-progress-status").textContent = "Pending";
-                document.getElementById("audio-progress-status").classList.remove("complete");
+                document.getElementById("audio-progress-icon").textContent =
+                    "...";
+                document
+                    .getElementById("audio-progress-icon")
+                    .classList.remove("complete");
+                document
+                    .getElementById("audio-progress-icon")
+                    .classList.add("pending");
+                document.getElementById("audio-progress-status").textContent =
+                    "Pending";
+                document
+                    .getElementById("audio-progress-status")
+                    .classList.remove("complete");
             }
-            
+
             function markProgressComplete(type) {
                 console.log(`Marking progress complete for: ${type}`);
                 const icon = document.getElementById(`${type}-progress-icon`);
-                const status = document.getElementById(`${type}-progress-status`);
-                
+                const status = document.getElementById(
+                    `${type}-progress-status`,
+                );
+
                 if (icon && status) {
                     icon.textContent = "✓";
                     icon.classList.remove("pending");
                     icon.classList.add("complete");
                     status.textContent = "Complete";
                     status.classList.add("complete");
-                    console.log(`Progress updated for ${type}: icon=${icon.textContent}, status=${status.textContent}`);
+                    console.log(
+                        `Progress updated for ${type}: icon=${icon.textContent}, status=${status.textContent}`,
+                    );
                 } else {
-                    console.error(`Could not find elements for ${type} progress indicator`);
+                    console.error(
+                        `Could not find elements for ${type} progress indicator`,
+                    );
                 }
             }
 
             // Function to cleanly stop playback
             function stopPlaybackAndAudio() {
-                 console.log("Stopping video and audio playback.");
-                 if (currentPlayerElement && !currentPlayerElement.paused) {
-                     currentPlayerElement.pause();
-                 }
-                 if (bufferPlayerElement && !bufferPlayerElement.paused) {
-                     bufferPlayerElement.pause();
-                 }
-                 if (scenarioAudioElement && !scenarioAudioElement.paused) {
-                     scenarioAudioElement.pause();
-                 }
-                 isAudioPlaying = false;
-                 // Keep hasAudioStarted as true if it was already started
+                console.log("Stopping video and audio playback.");
+                if (currentPlayerElement && !currentPlayerElement.paused) {
+                    currentPlayerElement.pause();
+                }
+                if (bufferPlayerElement && !bufferPlayerElement.paused) {
+                    bufferPlayerElement.pause();
+                }
+                if (scenarioAudioElement && !scenarioAudioElement.paused) {
+                    scenarioAudioElement.pause();
+                }
+                isAudioPlaying = false;
+                // Keep hasAudioStarted as true if it was already started
             }
 
             // Initialize the UI on page load

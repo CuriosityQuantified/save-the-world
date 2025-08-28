@@ -5,11 +5,12 @@ This module defines the main FastAPI application for the simulation system.
 """
 
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
 import sys
+import asyncio
 from dotenv import load_dotenv
 
 from services.llm_service import LLMService
@@ -34,8 +35,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Interactive Simulation API",
     description="API for the Interactive Simulation system",
-    version="1.0.0",
-    root_path="/api"  # Important for deployment routing
+    version="1.0.0"
 )
 
 # Add CORS middleware
@@ -46,6 +46,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add timeout middleware for long-running operations
+@app.middleware("http")
+async def timeout_middleware(request: Request, call_next):
+    # Allow longer timeouts for simulation operations
+    if request.url.path.startswith("/api/simulations") or request.url.path.startswith("/simulations"):
+        timeout = 150.0  # 2.5 minutes for media generation (slightly more than frontend timeout)
+    else:
+        timeout = 60.0  # 1 minute for other operations
+    
+    try:
+        return await asyncio.wait_for(call_next(request), timeout=timeout)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Request timeout - operation took too long")
 
 # Determine project root directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +78,7 @@ def init_services():
         cloudflare_r2_access_key_id = os.getenv("CLOUDFLARE_R2_ACCESS_KEY_ID")
         cloudflare_r2_secret_access_key = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
         cloudflare_r2_bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET_NAME")
+        cloudflare_r2_public_url = os.getenv("CLOUDFLARE_R2_PUBLIC_URL")
         
         # Get optional R2 settings with defaults
         cloudflare_r2_public_access = os.getenv("CLOUDFLARE_R2_PUBLIC_ACCESS", "true").lower() == "true"
@@ -98,6 +113,8 @@ def init_services():
         ]):
             logger.warning("Cloudflare R2 credentials incomplete or missing. Videos will not be persistently stored.")
         else:
+            if cloudflare_r2_public_url:
+                logger.info(f"Cloudflare R2 configured with public URL: {cloudflare_r2_public_url}")
             logger.info(f"Cloudflare R2 credentials found. Videos will be stored in R2 (Public access: {cloudflare_r2_public_access}).")
         
         # Initialize services
@@ -115,6 +132,7 @@ def init_services():
             cloudflare_r2_secret_access_key=cloudflare_r2_secret_access_key,
             cloudflare_r2_bucket_name=cloudflare_r2_bucket_name,
             cloudflare_r2_public_access=cloudflare_r2_public_access,
+            cloudflare_r2_public_url=cloudflare_r2_public_url,
             cloudflare_r2_url_expiry=cloudflare_r2_url_expiry
         )
         
