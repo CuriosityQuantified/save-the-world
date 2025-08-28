@@ -53,7 +53,23 @@ export default function SimulationPage({ initialScenario }) {
         const currentTurnNumber = message.simulation.current_turn_number || 1;
         const currentTurn = message.simulation.turns?.find(t => t.turn_number === currentTurnNumber);
         
-        setScenarioText(currentTurn?.selected_scenario?.situation_description || message.simulation.scenario?.situation_description || message.simulation.scenario || "Scenario update failed.");
+        // Extract all scenario parts and format them properly
+        const scenario = currentTurn?.selected_scenario;
+        let scenarioDisplay = "";
+        if (scenario) {
+          scenarioDisplay = scenario.situation_description || "";
+          if (scenario.user_role) {
+            scenarioDisplay += "\n\n" + scenario.user_role;
+          }
+          if (scenario.user_prompt) {
+            scenarioDisplay += "\n\n" + scenario.user_prompt;
+          }
+        } else {
+          scenarioDisplay = message.simulation.scenario?.situation_description || 
+                          message.simulation.scenario || 
+                          "Scenario loading...";
+        }
+        setScenarioText(scenarioDisplay);
         const videoUrls = currentTurn?.video_urls || message.simulation.video_urls || [];
         const audioUrl = currentTurn?.audio_url || message.simulation.audio_url || null;
         

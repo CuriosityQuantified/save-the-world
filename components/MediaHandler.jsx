@@ -199,11 +199,11 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
     }
   }, [currentVideoReady, audioElementReady, validVideoUrls.current.length]);
 
-  // Auto-play when media is ready
+  // Show play button when media is ready (don't auto-play)
   useEffect(() => {
     if (allMediaReady && activeRef.current && validVideoUrls.current.length > 0) {
-      console.log("All media ready, attempting to play current video and sync audio.");
-      playCurrentMedia();
+      console.log("All media ready, showing play button for user interaction.");
+      setShowPlayButton(true);
     }
   }, [allMediaReady, activeVideoUrl]);
 
@@ -336,14 +336,20 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
     if (!audio) return;
     
     const handleAudioEnd = () => {
+      console.log("Audio ended, stopping video loop");
       // When audio ends, pause both videos but keep them visible
       if (primaryVideoRef.current && !primaryVideoRef.current.paused) {
+        console.log("Pausing primary video");
         primaryVideoRef.current.pause();
       }
       if (bufferVideoRef.current && !bufferVideoRef.current.paused) {
+        console.log("Pausing buffer video");
         bufferVideoRef.current.pause();
       }
       setIsPlaying(false);
+      // Ensure we don't automatically continue to the next video
+      setCurrentVideoReady(false);
+      setNextVideoReady(false);
     };
     
     audio.addEventListener('ended', handleAudioEnd);
@@ -351,7 +357,7 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
     return () => {
       audio.removeEventListener('ended', handleAudioEnd);
     };
-  }, []);
+  }, [activeAudioUrl]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -520,7 +526,6 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
           height="100%"
           controls={false}
           muted={true}
-          autoPlay={true}
           playsInline={true}
           style={{ 
             display: activeVideoRef === 'primary' ? 'block' : 'none', 
@@ -537,7 +542,6 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
           height="100%"
           controls={false}
           muted={true}
-          autoPlay={true}
           playsInline={true}
           style={{ 
             display: activeVideoRef === 'buffer' ? 'block' : 'none', 
