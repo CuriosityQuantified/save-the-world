@@ -66,8 +66,12 @@ export default function SimulationPage({ initialScenario }) {
         setAudioGenerated(!!audioUrl);
         setHistory(prevHistory => {
           // Construct history carefully if needed, or rely on API response for full history
-          const assistantMessageContent = message.simulation.scenario?.situation_description || message.simulation.scenario || "No scenario generated.";
-          if (!prevHistory.find(msg => msg.role === 'assistant' && msg.content === assistantMessageContent)) {
+          const assistantMessageContent = currentTurn?.selected_scenario?.situation_description || 
+                                         currentTurn?.selected_scenario?.user_prompt || 
+                                         message.simulation.scenario?.situation_description || 
+                                         message.simulation.scenario || 
+                                         "";
+          if (assistantMessageContent && !prevHistory.find(msg => msg.role === 'assistant' && msg.content === assistantMessageContent)) {
               return [...prevHistory, { role: "assistant", content: assistantMessageContent}];
           }
           return prevHistory;

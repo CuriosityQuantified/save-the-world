@@ -20,6 +20,8 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
   // Loading progress states
   const [videosLoading, setVideosLoading] = useState(0);
   const [videosTotal, setVideosTotal] = useState(0);
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [showLoadingProgress, setShowLoadingProgress] = useState(true);
 
   // Using two video elements for seamless playback (one plays while the other preloads)
@@ -212,6 +214,8 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
     if (video) {
       video.play().then(() => {
         setIsPlaying(true);
+        setShowPlayButton(false);
+        setHasUserInteracted(true);
         if (audio && activeAudioUrl && audio.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
           if (currentVideoIndex === 0) {
             audio.currentTime = 0;
@@ -222,8 +226,13 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
         }
       }).catch(e => {
         console.error('Error playing video:', e);
-        setError(true);
-        handleVideoEnded();
+        // Show play button if autoplay fails and user hasn't interacted yet
+        if (!hasUserInteracted) {
+          setShowPlayButton(true);
+        } else {
+          setError(true);
+          handleVideoEnded();
+        }
       });
     }
   };
@@ -510,6 +519,9 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
           width="100%" 
           height="100%"
           controls={false}
+          muted={true}
+          autoPlay={true}
+          playsInline={true}
           style={{ 
             display: activeVideoRef === 'primary' ? 'block' : 'none', 
             objectFit: 'contain' 
@@ -524,6 +536,9 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
           width="100%" 
           height="100%"
           controls={false}
+          muted={true}
+          autoPlay={true}
+          playsInline={true}
           style={{ 
             display: activeVideoRef === 'buffer' ? 'block' : 'none', 
             objectFit: 'contain' 
@@ -535,6 +550,42 @@ const MediaHandler = ({ video_urls, audio_url, type = 'video/mp4', width = '100%
         {/* Audio element - always present for potential playback, but hidden */}
         {activeAudioUrl && (
           <audio ref={audioRef} preload="auto" loop={false} />
+        )}
+        
+        {/* Play button overlay when autoplay is blocked */}
+        {showPlayButton && !isPlaying && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            cursor: 'pointer',
+            zIndex: 10,
+          }} onClick={() => {
+            setShowPlayButton(false);
+            playCurrentVideo();
+          }}>
+            <button style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: '#00ff00',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              fontSize: '40px',
+              color: '#000',
+            }}>
+              ▶
+            </button>
+          </div>
         )}
       </div>
       
