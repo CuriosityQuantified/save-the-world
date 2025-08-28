@@ -130,7 +130,7 @@ class MediaService:
             # Generate video with HuggingFace
             # This might return a file path or binary content
             video_result = await self.huggingface_service.generate_video(
-                prompt, turn=turn)
+                prompt, turn=turn, max_retries=3)
 
             video_content: Optional[bytes] = None
             filename: str = f"turn_{turn}_{int(time.time())}.mp4"
@@ -377,19 +377,19 @@ class MediaService:
                     if delay > 0:
                         logger.info(f"Waiting {delay:.1f}s before starting video generation...")
                         await asyncio.sleep(delay)
-                    return await self.generate_video(prompt, turn=turn)
+                    return await self.generate_video(prompt, turn=turn, max_retries=3)
                 
                 for i, single_prompt in enumerate(video_prompt):
                     if isinstance(single_prompt, str):
-                        # Add 0.1 second delay between each video generation request
-                        delay = i * 0.1
+                        # Add 2 second delay between each video generation request to avoid rate limiting
+                        delay = i * 2.0
                         logger.info(f"[{time.time():.2f}] Creating video coroutine {i+1} of {len(video_prompt)} with {delay:.1f}s delay")
                         video_coroutines.append(delayed_video_generation(single_prompt, turn, delay))
                     else:
                         logger.warning(f"Item at index {i} in video_prompt list is not a string: {type(single_prompt)}. Skipping.")
             elif isinstance(video_prompt, str):
                 logger.info("Received a single video prompt. Creating one video coroutine.")
-                video_coroutines.append(self.generate_video(video_prompt, turn=turn))
+                video_coroutines.append(self.generate_video(video_prompt, turn=turn, max_retries=3))
             else:
                 logger.error(f"Invalid video_prompt type: {type(video_prompt)}. Expected str or list of str.")
                 return {'video_urls': None, 'audio_url': None} # Or handle error appropriately

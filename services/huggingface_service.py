@@ -61,13 +61,9 @@ class HuggingFaceService:
         logger.info(
             f"[Thread {thread_id}] Generating video with HuggingFace for prompt: {prompt[:100]}...")
 
-        # Create a dedicated client for this request to avoid shared state issues
-        # This prevents API serialization at the connection level
-        dedicated_client = InferenceClient(
-            provider="replicate",
-            api_key=self.api_key,
-        )
-        logger.info(f"[Thread {thread_id}] Created dedicated InferenceClient instance")
+        # Use the shared client instance to avoid creating too many connections
+        # This helps prevent rate limiting issues
+        logger.info(f"[Thread {thread_id}] Using shared InferenceClient instance")
 
         retry_count = 0
         video_data = None
@@ -91,9 +87,9 @@ class HuggingFaceService:
                     import threading
                     actual_thread = threading.current_thread().name
                     logger.info(f"[ACTUAL Thread {actual_thread}] Now in thread pool, making API call")
-                    return dedicated_client.text_to_video(prompt, model=self.model)
+                    return self.client.text_to_video(prompt, model=self.model)
                 
-                # Use dedicated client instance to avoid contention
+                # Use shared client instance for better connection pooling
                 video_data = await asyncio.wait_for(
                     asyncio.to_thread(run_video_generation),
                     timeout=timeout
@@ -108,7 +104,7 @@ class HuggingFaceService:
             except asyncio.TimeoutError:
                 retry_count += 1
                 if retry_count < max_retries:
-                    wait_time = 2 * retry_count  # Reduced backoff: 2, 4 seconds
+                    wait_time = 3 ** retry_count  # Exponential backoff: 3, 9, 27 seconds
                     logger.warning(f"Video generation timed out. Retrying in {wait_time} seconds... (Attempt {retry_count + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
                 else:
@@ -117,7 +113,7 @@ class HuggingFaceService:
             except Exception as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    wait_time = 2 * retry_count  # Reduced backoff: 2, 4 seconds
+                    wait_time = 3 ** retry_count  # Exponential backoff: 3, 9, 27 seconds
                     logger.warning(f"Video generation failed: {e}. Retrying in {wait_time} seconds... (Attempt {retry_count + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
                 else:
