@@ -52,7 +52,7 @@ app.add_middleware(
 async def timeout_middleware(request: Request, call_next):
     # Allow longer timeouts for simulation operations
     if request.url.path.startswith("/api/simulations") or request.url.path.startswith("/simulations"):
-        timeout = 150.0  # 2.5 minutes for media generation (slightly more than frontend timeout)
+        timeout = 300.0  # 5 minutes for media generation (matches frontend timeout)
     else:
         timeout = 60.0  # 1 minute for other operations
     

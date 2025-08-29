@@ -143,9 +143,9 @@ export default function SimulationPage({ initialScenario }) {
         throw new Error("Simulation ID is not set. Cannot submit response.");
       }
 
-      // Add 2-minute timeout for response processing
+      // Add 5-minute timeout for response processing (to allow for retries)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
       // Call backend directly to avoid proxy timeout issues
       const response = await fetch(`http://localhost:8000/simulations/${simulationId}/respond`, { // NEW: Use respond endpoint
@@ -193,9 +193,9 @@ export default function SimulationPage({ initialScenario }) {
     try {
       console.log("Initializing simulation - React V4 - Using POST /api/simulations");
       
-      // Add 2-minute timeout for video generation
+      // Add 5-minute timeout for video generation (to allow for retries)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
       // Call backend directly to avoid proxy timeout issues
       const response = await fetch("http://localhost:8000/simulations", { 

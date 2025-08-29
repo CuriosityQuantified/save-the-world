@@ -104,7 +104,7 @@ class HuggingFaceService:
             except asyncio.TimeoutError:
                 retry_count += 1
                 if retry_count < max_retries:
-                    wait_time = 3 ** retry_count  # Exponential backoff: 3, 9, 27 seconds
+                    wait_time = 2 ** retry_count  # Exponential backoff: 2, 4, 8 seconds
                     logger.warning(f"Video generation timed out. Retrying in {wait_time} seconds... (Attempt {retry_count + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
                 else:
@@ -113,7 +113,7 @@ class HuggingFaceService:
             except Exception as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    wait_time = 3 ** retry_count  # Exponential backoff: 3, 9, 27 seconds
+                    wait_time = 2 ** retry_count  # Exponential backoff: 2, 4, 8 seconds
                     logger.warning(f"Video generation failed: {e}. Retrying in {wait_time} seconds... (Attempt {retry_count + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
                 else:
