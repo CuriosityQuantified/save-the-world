@@ -9,6 +9,7 @@ export default function SimulationPage({ initialScenario }) {
   const [error, setError] = useState(null);
   const [turn, setTurn] = useState(0);
   const [MAX_TURNS, setMAX_TURNS] = useState(4);
+  const [userTurn, setUserTurn] = useState(0);  // Track actual user submissions
   const [userInput, setUserInput] = useState("");
 
   // State for media URLs received from the backend
@@ -56,7 +57,8 @@ export default function SimulationPage({ initialScenario }) {
         let scenarioDisplay = "";
         if (scenario) {
           scenarioDisplay = scenario.situation_description || "";
-          if (scenario.user_role) {
+          // Only include user_role for the very first turn (userTurn === 0)
+          if (scenario.user_role && userTurn === 0) {
             scenarioDisplay += "\n\n" + scenario.user_role;
           }
           if (scenario.user_prompt) {
@@ -125,12 +127,15 @@ export default function SimulationPage({ initialScenario }) {
   // Function to handle user response submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userInput.trim() || isLoading || turn >= MAX_TURNS) return;
+    if (!userInput.trim() || isLoading || turn > MAX_TURNS) return;
 
     setIsLoading(true);
     setScenarioGenerated(false);
     setVideosGenerated(false);
     setAudioGenerated(false);
+    
+    // Increment userTurn counter after first submission
+    setUserTurn(prev => prev + 1);
 
     const currentInput = userInput;
     // Update history immediately for user feedback
@@ -318,8 +323,9 @@ export default function SimulationPage({ initialScenario }) {
   return (
     <div style={{
       fontFamily: 'Arial, sans-serif',
+      backgroundColor: "#d4c5a0",  // Warm vintage color matching comic panels
       backgroundImage: "url(/UI_background.jpeg)",
-      backgroundSize: "cover",
+      backgroundSize: "contain",  // Changed from 'cover' to 'contain' to show full image
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
       minHeight: "100vh",
@@ -409,7 +415,7 @@ export default function SimulationPage({ initialScenario }) {
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "15px",
-          flex: 1,
+          height: "500px",  // Fixed height to prevent growing
           overflow: "hidden",
         }}>
           {/* Media Section - Now uses MediaHandler */}
@@ -462,12 +468,14 @@ export default function SimulationPage({ initialScenario }) {
             overflowY: "auto",
             fontSize: "0.75em",
             display: "flex",
-            flexDirection: "column-reverse",
+            flexDirection: isLoading && history.length === 0 ? "column" : "column-reverse",
+            justifyContent: isLoading && history.length === 0 ? "center" : "flex-start",
+            alignItems: isLoading && history.length === 0 ? "center" : "stretch",
             fontFamily: '"Press Start 2P", cursive',
           }}>
             <div ref={chatEndRef} />
             {isLoading && history.length === 0 ? (
-              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div style={{ textAlign: "center" }}>
                 <span style={{ color: "#00ff00" }}>Generating scenario...</span>
               </div>
             ) : (
@@ -513,8 +521,8 @@ export default function SimulationPage({ initialScenario }) {
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={turn >= MAX_TURNS ? "Simulation ended." : !simulationId ? "Start a simulation first..." : "Your response..."}
-            disabled={isLoading || turn >= MAX_TURNS || !simulationId}
+            placeholder={turn > MAX_TURNS ? "Simulation ended." : !simulationId ? "Start a simulation first..." : "Your response..."}
+            disabled={isLoading || turn > MAX_TURNS || !simulationId}
             style={{
               flexGrow: 1,
               padding: "10px",
@@ -526,7 +534,7 @@ export default function SimulationPage({ initialScenario }) {
               fontSize: "0.8em",
             }}
           />
-          <button type="submit" disabled={isLoading || turn >= MAX_TURNS || !simulationId} style={{
+          <button type="submit" disabled={isLoading || turn > MAX_TURNS || !simulationId} style={{
             padding: "10px 15px",
             borderRadius: "5px",
             border: "none",
@@ -535,7 +543,7 @@ export default function SimulationPage({ initialScenario }) {
             cursor: "pointer",
             fontFamily: 'inherit',
             fontSize: "0.8em",
-            opacity: (isLoading || turn >= MAX_TURNS || !simulationId) ? 0.5 : 1,
+            opacity: (isLoading || turn > MAX_TURNS || !simulationId) ? 0.5 : 1,
           }}>
             Send
           </button>
