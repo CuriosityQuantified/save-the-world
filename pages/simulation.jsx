@@ -20,6 +20,10 @@ export default function SimulationPage({ initialScenario }) {
   const [scenarioGenerated, setScenarioGenerated] = useState(false);
   const [videosGenerated, setVideosGenerated] = useState(false);
   const [audioGenerated, setAudioGenerated] = useState(false);
+  
+  // Conclusion state
+  const [showConclusion, setShowConclusion] = useState(false);
+  const [conclusionData, setConclusionData] = useState(null);
 
   const [history, setHistory] = useState([]);
   const inputRef = useRef(null);
@@ -61,7 +65,19 @@ export default function SimulationPage({ initialScenario }) {
           if (scenario.user_role && userTurn === 0) {
             scenarioDisplay += "\n\n" + scenario.user_role;
           }
-          if (scenario.user_prompt) {
+          // Check for conclusion (grade present)
+          if (scenario.grade !== undefined && scenario.grade !== null) {
+            // This is a conclusion scenario
+            setConclusionData({
+              scenario: scenarioDisplay,
+              grade: scenario.grade,
+              gradeExplanation: scenario.grade_explanation || "",
+              videoUrls: videoUrls,
+              audioUrl: audioUrl
+            });
+            setShowConclusion(true);
+          } else if (scenario.user_prompt) {
+            // Regular turn with user prompt
             scenarioDisplay += "\n\n" + scenario.user_prompt;
           }
         } else {
@@ -320,10 +336,149 @@ export default function SimulationPage({ initialScenario }) {
     </div>
   );
 
+  // Conclusion Overlay Component
+  const ConclusionOverlay = () => {
+    if (!showConclusion || !conclusionData) return null;
+    
+    return (
+      <div style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.95)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,
+        padding: "20px",
+        fontFamily: '"Press Start 2P", cursive',
+      }}>
+        <div style={{
+          maxWidth: "900px",
+          width: "100%",
+          backgroundColor: "#1a1a1a",
+          border: "3px solid #00ff00",
+          borderRadius: "10px",
+          padding: "30px",
+          boxShadow: "0 0 30px rgba(0, 255, 0, 0.5)",
+        }}>
+          <h2 style={{
+            color: "#00ff00",
+            textAlign: "center",
+            marginBottom: "20px",
+            fontSize: "1.5em",
+            textShadow: "2px 2px 4px rgba(0, 255, 0, 0.3)",
+          }}>
+            SIMULATION COMPLETE
+          </h2>
+          
+          {/* Final Video */}
+          {conclusionData.videoUrls && conclusionData.videoUrls.length > 0 && (
+            <div style={{
+              marginBottom: "20px",
+              display: "flex",
+              justifyContent: "center",
+            }}>
+              <video
+                src={conclusionData.videoUrls[0]}
+                autoPlay
+                loop
+                muted
+                style={{
+                  width: "400px",
+                  height: "225px",
+                  borderRadius: "5px",
+                  border: "2px solid #444",
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Conclusion Scenario */}
+          <div style={{
+            backgroundColor: "#2a2a2a",
+            padding: "20px",
+            borderRadius: "5px",
+            marginBottom: "20px",
+            border: "1px solid #444",
+          }}>
+            <h3 style={{ color: "#66ff66", marginBottom: "10px", fontSize: "0.9em" }}>
+              Final Assessment:
+            </h3>
+            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em" }}>
+              {conclusionData.scenario}
+            </p>
+          </div>
+          
+          {/* Grade Display */}
+          <div style={{
+            textAlign: "center",
+            marginBottom: "20px",
+          }}>
+            <div style={{
+              fontSize: "3em",
+              color: conclusionData.grade >= 70 ? "#00ff00" : conclusionData.grade >= 40 ? "#ffff00" : "#ff4444",
+              textShadow: "3px 3px 6px rgba(0, 0, 0, 0.5)",
+              marginBottom: "10px",
+            }}>
+              SCORE: {conclusionData.grade}/100
+            </div>
+          </div>
+          
+          {/* Grade Explanation */}
+          <div style={{
+            backgroundColor: "#2a2a2a",
+            padding: "20px",
+            borderRadius: "5px",
+            marginBottom: "20px",
+            border: "1px solid #444",
+          }}>
+            <h3 style={{ color: "#66ff66", marginBottom: "10px", fontSize: "0.9em" }}>
+              Performance Analysis:
+            </h3>
+            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em" }}>
+              {conclusionData.gradeExplanation}
+            </p>
+          </div>
+          
+          {/* Restart Button */}
+          <div style={{ textAlign: "center" }}>
+            <button
+              onClick={() => {
+                setShowConclusion(false);
+                setConclusionData(null);
+                window.location.reload();
+              }}
+              style={{
+                backgroundColor: "#00ff00",
+                color: "#000",
+                border: "none",
+                padding: "15px 30px",
+                fontSize: "0.9em",
+                fontFamily: '"Press Start 2P", cursive',
+                cursor: "pointer",
+                borderRadius: "5px",
+                boxShadow: "0 4px 6px rgba(0, 255, 0, 0.3)",
+                transition: "all 0.3s ease",
+              }}
+              onMouseOver={(e) => e.target.style.transform = "scale(1.05)"}
+              onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+            >
+              NEW SIMULATION
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{
       fontFamily: 'Arial, sans-serif',
-      backgroundColor: "#d4c5a0",  // Warm vintage color matching comic panels
+      backgroundColor: "#000000",  // Black background for better contrast
       backgroundImage: "url(/UI_background.jpeg)",
       backgroundSize: "contain",  // Changed from 'cover' to 'contain' to show full image
       backgroundPosition: "center",
@@ -340,48 +495,91 @@ export default function SimulationPage({ initialScenario }) {
       <Head>
         <title>Simulation Arcade</title>
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+        <style>{`
+          body, html {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            overflow-x: hidden;
+          }
+          * {
+            box-sizing: border-box;
+          }
+        `}</style>
       </Head>
 
       {/* Start New Simulation Button - Show when not started */}
       {!simulationStarted && (
-        <div style={{
-          textAlign: "center",
-          marginBottom: "40px",
-        }}>
-          <button
+        <>
+          <style jsx>{`
+            @keyframes glow-pulse {
+              0% {
+                box-shadow: 0 0 5px rgba(0, 255, 0, 0.5),
+                            0 0 10px rgba(0, 255, 0, 0.5),
+                            0 0 15px rgba(0, 255, 0, 0.5),
+                            0 0 20px rgba(0, 255, 0, 0.3);
+                transform: scale(1);
+              }
+              50% {
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.8),
+                            0 0 20px rgba(0, 255, 0, 0.8),
+                            0 0 30px rgba(0, 255, 0, 0.8),
+                            0 0 40px rgba(0, 255, 0, 0.5);
+                transform: scale(1.05);
+              }
+              100% {
+                box-shadow: 0 0 5px rgba(0, 255, 0, 0.5),
+                            0 0 10px rgba(0, 255, 0, 0.5),
+                            0 0 15px rgba(0, 255, 0, 0.5),
+                            0 0 20px rgba(0, 255, 0, 0.3);
+                transform: scale(1);
+              }
+            }
+            
+            .begin-button {
+              animation: glow-pulse 2s ease-in-out infinite;
+            }
+            
+            .begin-button:hover {
+              animation: glow-pulse 0.5s ease-in-out infinite !important;
+              transform: scale(1.1) !important;
+            }
+          `}</style>
+          <div style={{
+            position: "absolute",
+            top: "40.5%",  // Centered in the middle of the arcade screen
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 100,
+          }}>
+            <button
+              className="begin-button"
             onClick={() => {
               setSimulationStarted(true);
               initializeSimulation();
             }}
             disabled={isLoading}
             style={{
-              padding: "20px 40px",
-              fontSize: "1.2em",
+              padding: "12px 24px",
+              fontSize: "0.8em",
               fontFamily: '"Press Start 2P", cursive',
               backgroundColor: "#00ff00",
               color: "#000",
-              border: "none",
-              borderRadius: "10px",
-              cursor: "pointer",
-              textShadow: "0 0 5px #00ff00",
-              boxShadow: "0 0 20px rgba(0, 255, 0, 0.5)",
-              transition: "all 0.3s ease",
+              border: "2px solid #004400",
+              borderRadius: "6px",
+              cursor: isLoading ? "not-allowed" : "pointer",
+              fontWeight: "bold",
+              letterSpacing: "2px",
+              textShadow: "1px 1px 2px rgba(0, 0, 0, 0.5)",
+              textTransform: "uppercase",
               opacity: isLoading ? 0.5 : 1,
-            }}
-            onMouseOver={(e) => {
-              if (!isLoading) {
-                e.target.style.transform = "scale(1.1)";
-                e.target.style.boxShadow = "0 0 30px rgba(0, 255, 0, 0.8)";
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = "scale(1)";
-              e.target.style.boxShadow = "0 0 20px rgba(0, 255, 0, 0.5)";
+              transition: "all 0.3s ease",
             }}
           >
-            {isLoading ? "Starting..." : "Start New Simulation"}
-          </button>
-        </div>
+            {isLoading ? "Loading..." : "Begin"}
+            </button>
+          </div>
+        </>
       )}
 
       {/* Arcade Screen Content Area - Show after simulation starts */}
@@ -407,7 +605,7 @@ export default function SimulationPage({ initialScenario }) {
           fontSize: "0.8em",
           fontFamily: '"Press Start 2P", cursive',
         }}>
-          TURN {turn > 0 ? turn : 1}/{MAX_TURNS}
+          TURN {Math.min(turn > 0 ? turn : 1, MAX_TURNS)}/{MAX_TURNS}
         </div>
 
         {/* Content Grid */}
@@ -556,6 +754,9 @@ export default function SimulationPage({ initialScenario }) {
         )}
       </div>
       )}
+      
+      {/* Render Conclusion Overlay */}
+      <ConclusionOverlay />
     </div>
   );
 }

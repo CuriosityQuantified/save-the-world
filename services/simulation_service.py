@@ -119,7 +119,7 @@ class SimulationService:
                 scenario_id = scenario.get("id", "scenario_1_1")
                 description = scenario.get("situation_description", "Default scenario")
                 rationale = scenario.get("rationale", "Auto-generated")
-                user_role = scenario.get("user_role", "Crisis Response Specialist tasked with solving this absurd global threat")
+                user_role = scenario.get("user_role", "")
                 user_prompt = scenario.get("user_prompt", "What strategy will you implement to address this situation and save the world?")
 
                 scenario_model = Scenario(
@@ -292,7 +292,7 @@ class SimulationService:
                 }
                 # If it's not a conclusion, add role/prompt
                 if not is_final_user_turn_completed:
-                    fallback_scenario_fields["user_role"] = "Crisis Response Specialist"
+                    fallback_scenario_fields["user_role"] = ""
                     fallback_scenario_fields["user_prompt"] = "How would you address the ongoing situation given the information available to you?"
                 else: # Fallback for a conclusion turn might include a default grade
                     fallback_scenario_fields["grade"] = 50

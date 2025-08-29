@@ -455,11 +455,9 @@ def get_formatted_prompt_template(current_turn_number, max_turns):
   if current_turn_number == 1:
     return INITIAL_GENERATION_TEMPLATE
   elif current_turn_number == max_turns:
-    # For the final turn, we need to check if the context indicates we're generating a conclusion.
-    # This is handled in the LLM service by checking if user_prompt_for_this_turn is present.
-    # The template selection here is actually independent of that check.
-    # We'll return FINAL_TURN_TEMPLATE when on the max turn, and LLM service will control
-    # when it's used based on the presence of a user response.
-    return FINAL_TURN_TEMPLATE
+    # For turn 4, we still use TURN_GENERATION_TEMPLATE to show user_prompt
+    # The FINAL_TURN_TEMPLATE is selected directly in LLM service when generating conclusion
+    return TURN_GENERATION_TEMPLATE
   else:
+    # Use regular turn template for turns 2, 3, and 4
     return TURN_GENERATION_TEMPLATE

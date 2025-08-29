@@ -150,9 +150,8 @@ Reminder:
 3. Balance technical accuracy with creative visual interpretation
 4. Optimize for what works well with current video generation AI capabilities
 5. Consider the scenario from multiple perspectives, moods, and visual styles
-6. Make each prompt rich with sensory details that create a vivid mental image
-7. Video generation scenes should clearly portray and illustrate the situation described in the scenario.
-8. Your entire response MUST be a single, valid JSON object containing a key "scenes" with a list of four scene descriptions.
+6. Video generation scenes should clearly portray and illustrate the situation described in the scenario.
+7. Your entire response MUST be a single, valid JSON object containing a key "scenes" with a list of four scene descriptions.
 
 **CRITICAL REMINDER:** The JSON must be complete, syntactically correct, and NOT truncated. Verify the closing brackets `]` and `}}` are present and correctly placed. No extra text or explanation outside the JSON object.
 """
