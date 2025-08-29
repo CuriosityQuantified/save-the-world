@@ -26,42 +26,33 @@ The value for "scenes" MUST be a list containing exactly 4 strings. Each string 
 </process>
 
 <Prompt Engineering Best Practices>
-For each scene prompt, include ALL of the following elements:
+For each scene prompt, create a CLEAR and CONCISE description that includes:
 
-1. CAMERA SPECIFICATIONS (choose one specific approach per scene):
-   - Type: Static, handheld, drone, tracking, dolly, pan, tilt
-   - Movement: Specify exact motion if any (e.g., "slow pan from left to right")
-   - Angle: High, low, eye-level, dutch, overhead, POV
-   - Shot type: Wide, medium, close-up, extreme close-up
+1. MAIN SUBJECT & ACTION:
+   - What is happening in simple, clear terms
+   - Focus on one main action or moment
+   - Use specific verbs (e.g., "running" not "moving")
 
-2. SUBJECT & ACTION DETAILS:
-   - Describe subject(s) with specific visual details (appearance, clothing, expression)
-   - Specify exact actions with clear verbs (e.g., "sprinting" not just "running")
-   - Include anatomical precision for human/animal subjects
-   - Describe interactions between multiple subjects if applicable
+2. SETTING:
+   - Where the scene takes place
+   - Time of day if relevant
+   - Basic environmental details
 
-3. ENVIRONMENT & CONTEXT:
-   - Detailed description of location/setting
-   - Time of day and specific lighting conditions
-   - Weather elements if applicable
-   - Environmental objects, textures, and spatial relationships
+3. CAMERA:
+   - Simple shot type (wide, close-up, overhead, etc.)
+   - Camera movement if any (pan, zoom, static)
 
-4. VISUAL STYLE & AESTHETICS:
-   - Color palette or color grading style
-   - Film genre or visual reference (e.g., "noir style", "Wes Anderson-inspired")
-   - Lighting quality (harsh, soft, dramatic, diffused)
-   - Atmospheric elements (fog, dust, smoke, etc.)
-   - Visual effects or post-processing suggestions
+4. VISUAL STYLE (optional, keep brief):
+   - Overall mood or tone
+   - Key colors or lighting
 
-5. TECHNICAL SPECIFICATIONS:
-   - Frame rate suggestion if relevant (normal, slow-motion, time-lapse)
-   - Depth of field (shallow, deep, rack focus)
-
-6. AVOID:
+AVOID:
    - Vague descriptions or abstract concepts
    - Multiple scenes or transitions within a single prompt
    - Text overlays or UI elements
    - Technically impossible camera movements
+   - Overly complex technical specifications
+   - Excessive detail that confuses the core action
 </Prompt Engineering Best Practices>
 
 <examples to guide your output>
@@ -70,10 +61,10 @@ Scenario: "All birds in the world have gone on strike, demanding more bird feed 
 Output:
     {{
       "scenes": [
-        "Drone shot, slowly ascending vertically over Manhattan skyline. Thousands of birds circle in a massive clockwise formation directly above skyscrapers. Camera captures the full 360-degree view of the organized avian pattern. Environment shows an overcast sky with dramatic cumulonimbus clouds, golden hour lighting creating long shadows across buildings. Visual style uses desaturated blues and grays with occasional highlights on bird wings. Deep depth of field ensures both birds and cityscape remain in focus.",
-        "Static camera, low angle shot from street level. A military-precise formation of pigeons and sparrows march along a downtown sidewalk, pecking in perfect unison. Subjects wear naturally puffed chests, with lead birds gesturing with wing movements as if directing. Urban environment shows concrete paths, scattered trash, and looming glass buildings. Morning light casts long shadows across pavement. Cinematic neo-noir style with high contrast lighting emphasizes birds' shadows. Shallow depth of field blurs distant buildings while keeping bird formation tack-sharp.",
-        "Static wide shot, eye-level perspective. Hundreds of crows and seagulls perch densely on neoclassical city hall building, completely covering the facade, columns, and statues. Birds occasionally peck at stonework with assertive, deliberate movements. Environment shows a deserted city plaza with empty benches and scattered newspapers. Midday harsh lighting creates minimal shadows. Visual style employs muted color palette with selective focus on central gathering. Documentary-style composition with deep depth of field. 16:9 aspect ratio with normal frame rate.",
-        "Medium tracking shot following a female news reporter (30s, professional attire, concerned expression) as she walks cautiously through a park. Behind her, hundreds of birds (variety of species) perch on every available surface - trees, benches, lamp posts - all facing her direction in unnatural silence. Environment shows an otherwise normal urban park in early morning light with dew-covered grass. Cinematic thriller aesthetic with cool color grading and desaturated greens. Handheld camera with subtle movement suggests tension. Shallow depth of field keeps reporter in focus while birds create menacing background elements."
+        "Aerial view of city skyline with thousands of birds flying in a giant circle above the buildings. The birds move together like a dark cloud. Overcast day.",
+        "Street level view of pigeons marching in formation down a sidewalk like tiny soldiers. They peck at the ground in unison. Morning in the city.",
+        "Wide shot of city hall completely covered in birds. Crows and seagulls perch on every surface of the building. Empty plaza below.",
+        "A news reporter walks through a park while hundreds of silent birds watch her from trees and benches. Camera follows her movement. Early morning."
       ]
     }}
 
@@ -82,10 +73,10 @@ Scenario: "Rainbows, once ephemeral, have solidified overnight into rigid, trans
 Output:
     {{
       "scenes": [
-        "Tracking drone shot that circles around a solidified rainbow bridge arcing between two modern glass skyscrapers. A single red sedan is suspended motionless at the apex of the rainbow, slightly sinking into the translucent surface. Environment shows a clear blue sky contrasting with the vibrant rainbow colors reflecting prisms of light onto surrounding buildings. Downtown cityscape visible below with pedestrians gathering to look upward. Visual style employs hyper-realistic colors with emphasis on refracted light patterns. Technical specifications include smooth circular camera movement, deep depth of field capturing both trapped car and city details.",
-        "Extreme close-up with static camera. A hairline fracture slowly propagates across the translucent crystalline surface of a solidified rainbow. The structure displays visible stress patterns with prismatic light refractions intensifying around the crack. Environment shows small debris and dust particles dislodging from the fracture. Background is intentionally out of focus but suggests an urban setting. Visual style uses macro photography aesthetics with vibrant, saturated colors and dramatic side lighting highlighting the internal structure of the rainbow material. Shallow depth of field with rack focus shifting from one end of the crack to the other.",
-        "Low angle static shot looking upward at a solid rainbow bridge spanning across a residential neighborhood. A vintage bicycle (red frame, wire basket) teeters precariously on the rainbow's curved edge, wheels slowly turning as if searching for traction. Environment shows a clear blue sky as backdrop with the sun positioned to create a lens flare effect through the translucent rainbow structure. Suburban houses visible beneath. Visual style employs whimsical, Wes Anderson-inspired symmetrical composition with pastel color palette emphasized in the neighborhood below. Technical specifications include extreme wide-angle lens creating slight distortion at edges, deep depth of field.",
-        "Wide establishing shot from mountain ridgeline. Multiple solid rainbows of varying sizes connect different peaks across a dramatic valley landscape. On the nearest rainbow bridge, a small helicopter sits motionless, slightly sinking into the surface. Environment shows early morning mist rising from valley floor, pine forests on mountainsides, and snow-capped peaks in distance. Golden sunrise lighting creates dramatic shadows across terrain. Visual style uses epic nature documentary aesthetics with rich, saturated colors and crisp details. Technical specifications include static camera with panoramic framing, extremely deep depth of field capturing foreground rainbow and distant landscape elements."
+        "Circling drone shot of a solid rainbow bridge between two skyscrapers. A red car is stuck at the top, sinking slightly into the rainbow. Clear day, city below.",
+        "Close-up of a crack spreading across a solid rainbow surface. The rainbow looks like colored glass breaking. Bits of rainbow falling off.",
+        "Looking up at a solid rainbow over suburban houses. A bicycle balances on the rainbow's edge. Blue sky, residential neighborhood below.",
+        "Wide mountain view showing multiple solid rainbows connecting peaks. A helicopter sits stuck on one rainbow. Morning mist in the valley."
       ]
     }}
 
@@ -94,10 +85,10 @@ Scenario: "A single, sentient kitchen knife floats ominously in a brightly lit s
 Output:
     {{
       "scenes": [
-        "Static close-up shot focusing on a gleaming chef's knife floating horizontally at eye-level above a clean granite countertop. The knife slowly rotates, reflecting the bright overhead fluorescent lights. It gently nudges a nearby fork with its tip. Environment shows a modern, sterile kitchen with white cabinets and stainless steel appliances blurred in the background. Visual style is minimalist horror with sharp focus on the knife. Shallow depth of field. Normal frame rate.",
-        "Handheld POV shot from the perspective of someone cautiously entering the kitchen. The floating knife is visible in the center of the frame, hovering near a wooden knife block. It makes a sharp, quick turn towards the camera as the 'person' enters. Environment shows a typical suburban kitchen with a breakfast nook visible beyond. Morning sunlight streams through a window, creating some lens flare. Found-footage horror aesthetic with shaky camera movement. Deep depth of field keeps both knife and kitchen details relatively clear.",
-        "Low angle static medium shot capturing the floating knife as it bumps against a hanging pot rack, causing spoons and spatulas to sway and clatter softly. The knife remains perfectly still after the contact. Environment shows the kitchen ceiling with the pot rack and other hanging utensils. Background shows upper cabinets. Lighting is bright, standard kitchen illumination. Suspenseful visual style with emphasis on the unnatural stillness of the knife versus the movement it causes. Deep depth of field.",
-        "Overhead tracking shot following the floating knife as it glides smoothly just above the kitchen island. It stops near a bowl of fruit and seems to 'inspect' an apple before moving on. Environment shows the entire kitchen layout from above - countertops, appliances, island, floor tiles. Lighting is even and bright. Eerie, almost clinical visual style. Smooth, slow camera movement. Deep depth of field captures all kitchen details."
+        "Close-up of a kitchen knife floating above a counter. The knife slowly spins and taps a fork. Bright kitchen, modern appliances in background.",
+        "POV shot entering a kitchen. A floating knife hovers near the knife block, then quickly turns toward the camera. Suburban kitchen, morning light.",
+        "Low angle shot of a floating knife bumping into hanging pots and pans, making them swing. Kitchen ceiling with pot rack visible.",
+        "Overhead view following a floating knife as it glides over a kitchen island. The knife pauses near a fruit bowl. View of entire kitchen from above."
       ]
     }}
 
@@ -106,10 +97,10 @@ Scenario: "Coffee has become sentient and refuses to be consumed until certain d
 Output:
     {{
       "scenes": [
-        "Static medium shot of a steaming coffee mug on a kitchen counter. The dark liquid inside ripples and forms a small whirlpool despite no external movement. Steam rises in deliberate patterns rather than random wisps. Environment shows a modern kitchen at dawn, soft golden light filtering through blinds. Visual style uses warm amber tones with dramatic shadows. Shallow depth of field focuses on the mug while blurring background appliances.",
-        "Tracking shot following a businessman (40s, navy suit, confused expression) as he approaches a coffee shop counter. All coffee machines behind the barista are bubbling violently, spraying coffee upward in synchronized jets. Environment shows a busy urban café with morning commuters frozen in shock. Cool blue color grading with selective warm highlights on the coffee. Handheld camera movement adds urgency.",
-        "Low angle close-up of coffee dripping upward from a cup back into a pour-over filter, defying gravity. The liquid moves slowly and deliberately, forming momentary patterns mid-air. Environment shows a minimalist apartment kitchen with monochromatic decor. Harsh side lighting creates dramatic shadows. Visual style employs high contrast black and white aesthetic with slow-motion frame rate.",
-        "Wide static shot of a corporate boardroom where executives sit around a large table. At the center, coffee from multiple mugs rises into the air, forming a floating, rotating sphere. Environment shows floor-to-ceiling windows with cityscape beyond, mid-morning light casting grid patterns on the table. Visual style uses corporate thriller aesthetics with desaturated blues and grays. Deep depth of field keeps all elements in focus."
+        "Medium shot of a coffee mug on a counter. The coffee inside swirls by itself, forming a small whirlpool. Steam makes shapes in the air. Kitchen at dawn.",
+        "Following a businessman walking to a coffee shop counter. All the coffee machines are spraying coffee upward in unison. Busy café, shocked customers.",
+        "Close-up of coffee flowing upward from a cup back into a filter, defying gravity. The coffee moves in slow motion. Minimalist kitchen.",
+        "Wide shot of a boardroom. Coffee from multiple mugs floats up and forms a spinning sphere in the air. Executives watch from around the table."
       ]
     }}
 
@@ -118,10 +109,10 @@ Scenario: "Plants have developed the ability to move rapidly and are reclaiming 
 Output:
     {{
       "scenes": [
-        "Timelapse wide shot of a city intersection where vines and roots visibly crack through asphalt, growing several feet per second. Traffic lights are engulfed by climbing plants. Environment shows an abandoned urban setting at midday with harsh sunlight. Visual style employs vibrant greens against gray concrete. Deep depth of field captures multiple layers of plant invasion.",
-        "Tracking dolly shot following a tendril of ivy as it rapidly snakes across an office building lobby floor, climbing up a reception desk. The plant moves with purpose, like a living creature. Environment shows a corporate space with glass and chrome elements, emergency lighting only. Visual style uses horror film aesthetics with high contrast and cool blue tones.",
-        "Dutch angle medium shot of a park bench being slowly lifted and tilted by tree roots emerging from the ground. The wooden slats crack under pressure. Environment shows a city park at dusk with long shadows and golden backlight. Visual style employs magical realism with enhanced colors and soft focus edges. Shallow depth of field.",
-        "Overhead drone shot slowly descending over a residential neighborhood where trees and shrubs have broken through fences, connecting yards into one continuous green space. Environment shows suburban layout with swimming pools now filled with lily pads. Morning mist hangs low. Documentary style with natural color grading and even exposure."
+        "Timelapse of vines breaking through street asphalt and growing rapidly. Plants climb up traffic lights. Abandoned city intersection, bright daylight.",
+        "Following an ivy vine as it quickly crawls across an office lobby floor and up a desk. The plant moves like it's alive. Corporate building, emergency lighting.",
+        "Tilted angle shot of tree roots lifting a park bench from below. The bench cracks as roots push through. City park at sunset.",
+        "Aerial view descending over a neighborhood where plants have taken over, breaking through fences. Pools are full of lily pads. Morning mist."
       ]
     }}
 
@@ -130,10 +121,10 @@ Scenario: "The moon has suddenly moved much closer to Earth, appearing 10 times 
 Output:
     {{
       "scenes": [
-        "Static wide shot of a beach at night with an enormous moon dominating the sky, casting bright silver light across the water. Waves crash abnormally high due to gravitational pull. Environment shows palm trees bending in strong winds. Visual style employs high contrast lighting with deep shadows and silver highlights. Deep depth of field keeps foreground and moon in focus.",
-        "Tracking shot following a young woman (20s, casual clothes, awestruck expression) as she runs up a hillside, staring upward at the massive moon filling half the sky. Environment shows a rural landscape with tall grass bending in lunar-pulled wind. Twilight lighting creates purple-blue gradient in sky. Handheld camera with slight shake conveys urgency.",
-        "Low angle close-up of a telescope eyepiece with a reflection of the giant moon visible in the glass. An astronomer's eye (with visible iris detail) blinks in shock. Environment shows a dark observatory with red emergency lights. Film noir visual style with dramatic shadows. Extremely shallow depth of field focuses only on the eye and reflection.",
-        "Panning shot across a city skyline at night where the enormous moon illuminates everything in bright white light, eliminating shadows. Streets below are filled with people looking upward. Environment shows modern urban architecture with reflective surfaces amplifying the moonlight. Cool blue color grading with lens flare effects. Normal frame rate with smooth camera movement."
+        "Wide beach shot at night. A giant moon fills the sky, ten times normal size. Huge waves crash on shore. Palm trees bend in strong wind.",
+        "Following a woman running up a hill while looking at the massive moon above. The moon takes up half the sky. Grass blowing in wind, twilight.",
+        "Close-up of an astronomer's eye reflected in a telescope, with the giant moon visible in the reflection. Dark observatory with red lights.",
+        "Panning across a city skyline lit by the enormous moon. Everything is bright as day. People in the streets looking up at the sky."
       ]
     }}
 </examples to guide your output>
