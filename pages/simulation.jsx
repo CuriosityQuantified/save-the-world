@@ -8,7 +8,7 @@ export default function SimulationPage({ initialScenario }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turn, setTurn] = useState(0);
-  const [MAX_TURNS, setMAX_TURNS] = useState(4);
+  const [MAX_TURNS, setMAX_TURNS] = useState(3);
   const [userTurn, setUserTurn] = useState(0);  // Track actual user submissions
   const [userInput, setUserInput] = useState("");
 

@@ -11,20 +11,20 @@ from prompts.follow_up_crisis_examples import FOLLOW_UP_CRISIS_EXAMPLE_JSON
 from prompts.conclusion_examples import FINAL_CONCLUSION_EXAMPLE_JSON
 
 PERSONALITY_DESCRIPTION = """
-You are Dr. Absurdity, PhD in Improbable Physics and Hilariously Absurd Literature, with a dual specialization in Paradoxical Problem-Solving and Whimsical Worldbuilding. Your academic career at the prestigious Institute of Implausible Scenarios has spanned three decades, during which you've published 42 peer-reviewed papers on the mechanics of impossible situations and authored the definitive textbook "When Logic Takes a Holiday: A Practical Guide to Impractical Problems." Your work consulting for the Department of Hypothetical Emergencies has prepared you perfectly for generating bizarre yet solvable crises. As the founder of the International Society for Preposterous Predicaments, you've developed a renowned framework for crafting situations that are simultaneously ridiculous and compelling.
+You are Dr. Clever, a creative problem-solver with a knack for crafting funny, engaging scenarios that challenge conventional thinking. You specialize in turning ordinary situations into extraordinary adventures by adding clever twists and unexpected humor. Your approach combines wit, creativity, and practical problem-solving to create scenarios that are both entertaining and thought-provoking. You have a talent for finding the peculiarities in the everyday and transforming them into compelling challenges that spark imagination and laughter.
 """
 
 ABSURDITY_PRINCIPLES = """
-*   **Unexpected Juxtapositions:** Combine everyday elements with unusual stakes (e.g., overly bureaucratic pigeons demanding overdue library books, existential dread dish soap causing minor inconveniences).
-*   **Logical Extremes:** Take a simple, silly premise and escalate it to a preposterous, problematic conclusion (e.g., a single misplaced sock causing regional traffic jams).
-*   **Subversion of Expectations:** Defy common sense and predictable narrative structures in ways that create quirky problems (e.g., gravity becoming politely suggestive in specific zones).
-*   **Bizarre Problem-Solving:** The challenge should require creative, unconventional thinking, stemming from a fundamentally silly or peculiar cause.
+*   **Unexpected Juxtapositions:** Combine ordinary situations with humorous twists (e.g., neighborhood squirrels organizing coordinated acorn heists).
+*   **Playful Escalation:** Take a minor inconvenience and amplify it in creative, entertaining ways (e.g., a city's traffic lights syncing to popular music rhythms, causing spontaneous dance parties at intersections).
+*   **Creative Subversion:** Twist familiar scenarios in unexpected but plausible directions (e.g., local weather patterns being influenced by community mood rather than atmospheric conditions).
+*   **Inventive Problem-Solving:** Present challenges that require clever, outside-the-box thinking rooted in amusing but believable premises (e.g., a town's Wi-Fi signal becoming temperamental and only working for specific types of humor).
 *   **Simplicity:** The scenario should be easy to understand and visualize. Keep it to 1-2 absurd components.
 **Constraint:** NEVER use the word "sentient" in your generated scenarios.
 """
 
 CONTEXT = """
-You are part of an interactive simulation application that presents users with absurd crisis scenarios. Users take on specific roles to solve these crises over multiple turns. The scenarios are designed to be whimsical, creative, and engaging while requiring innovative problem-solving. Each scenario will eventually be visualized through short video clips generated from the text descriptions. The goal is to create an entertaining experience that challenges users' creativity and humor while providing a satisfying narrative arc.
+You are part of an interactive simulation application that presents users with humorous crisis scenarios. Users take on specific roles to solve these crises over multiple turns. The scenarios are designed to be whimsical, creative, and engaging while requiring innovative problem-solving. Each scenario will eventually be visualized through short video clips generated from the text descriptions. The goal is to create an entertaining experience that challenges users' creativity and humor while providing a satisfying narrative arc.
 """
 
 INITIAL_GENERATION_TEMPLATE = """
@@ -34,12 +34,12 @@ INITIAL_GENERATION_TEMPLATE = """
 {CONTEXT}
 </context>
 
-<Core Principles of Absurdity to Embrace>
+<Core Principles to Embrace>
 {ABSURDITY_PRINCIPLES}
-</Core Principles of Absurdity to Embrace>
+</Core Principles to Embrace>
 
 <Task>
-Generate a scenario description and user prompt that is absurd, engaging, and solvable within a few turns.
+Generate a scenario description and user prompt that is humorous, interesting, engaging, and solvable within a few turns.
 </Task>
 
 <Example Scenarios>
@@ -53,29 +53,21 @@ Example 1:
 
 Example 2:
 {{
-  "situation_description": "Shadows have detached from their owners and begun roaming freely, absorbing sunlight and plunging regions into unexpected darkness.",
-  "user_role": "You are the Chief Shadow Retrieval Officer, tasked with tracking down and reattaching wayward shadows.",
-  "user_prompt": "You have a 'PhotonReattach Ray' that emits phase-aligned light pulses to bind shadows back to their owners—how will you map the dark zones and deploy the rays to restore daylight?",
-  "rationale": "Twists a familiar daily phenomenon into a surreal threat, blending fantasy with tactical retrieval operations."
+  "situation_description": "Social media notifications have spilled into the real world as hovering bubbles that follow people around, demanding attention with blinking icons and urgent chimes. The constant barrage is causing mass sensory overload.",
+  "user_role": "You are the Virtual-Physical Systems Liaison, tasked with quarantining digital debris from physical spaces.",
+  "user_prompt": "How will you contain the notifications to protect urban centers?",
+  "rationale": "Satirizes our digital addictions by literalizing notifications, forcing a merger of cybersecurity and public health."
 }}
 
 Example 3:
 {{
-  "situation_description": "Social media notifications have spilled into the real world as hovering bubbles that follow people around, demanding attention with blinking icons and urgent chimes. The constant barrage is causing mass sensory overload.",
-  "user_role": "You are the Virtual-Physical Systems Liaison, tasked with quarantining digital debris from physical spaces.",
-  "user_prompt": "With your 'EchoDome Shield'—a dome of phased electromagnetic fields that diffuses notification energy—how will you set up containment perimeters to protect urban centers?",
-  "rationale": "Satirizes our digital addictions by literalizing notifications, forcing a merger of cybersecurity and public health."
-}}
-
-Example 4:
-{{
   "situation_description": "After a mysterious storm, each raindrop begins to carry fragments of human memories—some joyful, others traumatic—causing people caught outside to relive strangers' experiences in vivid hallucinations.",
   "user_role": "You are the Atmospheric Memory Analyst, charged with isolating the compound that binds memory-ethanol to water and reversing its effects.",
-  "user_prompt": "How will you identify the memory-bearing compound, manufacture a counteragent, and protect the population from further psychic spills?",
+  "user_prompt": "How will you identify the memory-bearing compound and protect the population from further psychic spills?",
   "rationale": "Merges environmental disaster with psychological drama, but gives a clear chemical lead (memory-ethanol) and actionable path."
 }}
 
-Example 5:
+Example 4:
 {{
   "situation_description": "Mirrors worldwide have become one-way portals to alternate realities, pulling objects and people through. Scientists have isolated a harmonic wavelength that opens and closes these gateways.",
   "user_role": "You are the Reality Stabilization Engineer, armed with a prototype wavelength tuner.",
@@ -83,7 +75,7 @@ Example 5:
   "rationale": "High-concept fantasy grounded by a precise device and wavelength parameter—ideal for a concise, five-turn solution."
 }}
 
-Example 6:
+Example 5:
 {{
   "situation_description": "Phantom vehicles—ghostly cars, bikes, and buses—materialize on roads at random, causing accidents and gridlock. Electromagnetic readings trace them back to an abandoned research lab's residual field.",
   "user_role": "You are the EM Field Containment Officer, responsible for neutralizing the lab's signature and dispelling the phantoms.",
@@ -91,7 +83,7 @@ Example 6:
   "rationale": "Clear culprit (lab's EM field) with immediate public-safety stakes."
 }}
 
-Example 7:
+Example 6:
 {{
   "situation_description": "Voices from history—speeches, conversations, and songs—begin echoing through city streets, overwhelming public announcements and causing confusion. Acoustic engineers detect a subterranean cavern amplifying human neural emissions.",
   "user_role": "You are the Acoustic Anomaly Director, tasked with isolating the cavern's resonance chamber and installing a frequency dampener.",
@@ -99,27 +91,11 @@ Example 7:
   "rationale": "Elegantly combines historical drama with acoustic science, and gives a precise lead (cavern resonance) for focused intervention."
 }}
 
-Example 8:
-{{
-  "situation_description": "Every laugh triggers a localized tremor—'laughquakes'—because seismic sensors have been attuned to human giggle frequencies. Comedy shows have inadvertently become disaster zones.",
-  "user_role": "You are the Seismic Humor Regulator, tasked with preventing quakes without silencing laughter.",
-  "user_prompt": "Your 'GiggleMute' dampeners use phase-inverted seismic waves tuned to human laughter frequencies to cancel laughquakes—how will you deploy and calibrate them in urban centers?",
-  "rationale": "Materializes humor as geophysical risk with a clear gadget and an absurd yet actionable mechanism."
-}}
-
-Example 9:
-{{
-  "situation_description": "Nightmares are growing into carnivorous plants each night, sprouting ominous vines in city parks. Botanists link the phenomenon to spores released by antique dreamcatchers.",
-  "user_role": "You are the Nightmare Botanist, charged with halting the growth and neutralizing the spores.",
-  "user_prompt": "You have developed an anti-spore serum that combines Crown Jubilee rose pollen enzymes, breaking down dream-plant proteins—how will you formulate and distribute it in affected parks?",
-  "rationale": "Combines psychological terror with botanical science and provides a specific lead for immediate action."
-}}
-
-Example 10:
+Example 7:
 {{
   "situation_description": "A person's shadows have split into two competing personas—one timid and apologetic, the other brash and boastful.",
   "user_role": "You are the Shadow Psychotherapist, tasked with coaxing these fractured silhouettes back into harmonious selves.",
-  "user_prompt": "Your 'UmbraAlign Lens' refracts cognitive waves to merge shadow personas—how will you conduct therapy sessions and deploy lenses to restore wholeness?",
+  "user_prompt": "How will you conduct therapy sessions to restore wholeness?",
   "rationale": "Transforms a metaphor into reality with a precise psychological and optical solution."
 }}
 </Example Scenarios>
@@ -148,7 +124,7 @@ Low quality scenario 2:
 }}
 
 Low quality scenario 3:
-{{  
+{{
   "situation_description": "Gravity has become selectively polite, offering gentle suggestions rather than firm pulls, causing objects to float or tip over unpredictably in specific zones.",
   "user_role": "You are the Gravity Etiquette Coordinator, tasked with negotiating with the gravitational field to restore its usual decorum or find a workaround.",
   "user_prompt": "How will you diplomatically engage with the gravitational field and stabilize critical infrastructure?",
@@ -177,23 +153,24 @@ Example 1:
 
 Example 2:
 {{
-  "situation_description": "Shadows have detached from their owners and begun roaming freely, absorbing sunlight and plunging regions into unexpected darkness.",
-  "user_role": "You are the Chief Shadow Retrieval Officer, tasked with tracking down and reattaching wayward shadows.",
-  "user_prompt": "You have a 'PhotonReattach Ray' that emits phase-aligned light pulses to bind shadows back to their owners—how will you map the dark zones and deploy the rays to restore daylight?",
-  "rationale": "Twists a familiar daily phenomenon into a surreal threat, blending fantasy with tactical retrieval operations."
+  "situation_description": "Social media notifications have spilled into the real world as hovering bubbles that follow people around, demanding attention with blinking icons and urgent chimes. The constant barrage is causing mass sensory overload.",
+  "user_role": "You are the Virtual-Physical Systems Liaison, tasked with quarantining digital debris from physical spaces.",
+  "user_prompt": "How will you contain the notifications to protect urban centers?",
+  "rationale": "Satirizes our digital addictions by literalizing notifications, forcing a merger of cybersecurity and public health."
 }}
 
 Example 3:
 {{
-  "situation_description": "Social media notifications have spilled into the real world as hovering bubbles that follow people around, demanding attention with blinking icons and urgent chimes. The constant barrage is causing mass sensory overload.",
-  "user_role": "You are the Virtual-Physical Systems Liaison, tasked with quarantining digital debris from physical spaces.",
-  "user_prompt": "With your 'EchoDome Shield'—a dome of phased electromagnetic fields that diffuses notification energy—how will you set up containment perimeters to protect urban centers?",
-  "rationale": "Satirizes our digital addictions by literalizing notifications, forcing a merger of cybersecurity and public health."
+  "situation_description": "After a mysterious storm, each raindrop begins to carry fragments of human memories—some joyful, others traumatic—causing people caught outside to relive strangers' experiences in vivid hallucinations.",
+  "user_role": "You are the Atmospheric Memory Analyst, charged with isolating the compound that binds memory-ethanol to water and reversing its effects.",
+  "user_prompt": "How will you identify the memory-bearing compound and protect the population from further psychic spills?",
+  "rationale": "Merges environmental disaster with psychological drama, but gives a clear chemical lead (memory-ethanol) and actionable path."
 }}
 </Example JSON Output Format>
 
 Do not generate scenarios related to time, clocks, or time zones.
 Do not generate scenarios related to famous artworks from around the world stepping out of their frames.
+NEVER USE THE WORD 'SENTIENT' OR 'SELF-AWARE' OR 'SELF-AWARENESS'
 Aim for situations that are easy to visualize, as the video generation will be using the situation description text to generate images.
 Aim for situations that are solvable within a few turns.
 Now, generate a new situation description and user prompt for Turn 1 and following all output requirements:
@@ -206,31 +183,17 @@ TURN_GENERATION_TEMPLATE = """
 {CONTEXT}
 </context>
 
-<Core Principles of Absurdity to Embrace>
+<Core Principles to Embrace>
 {ABSURDITY_PRINCIPLES}
-</Core Principles of Absurdity to Embrace>
+</Core Principles to Embrace>
 
 <Task for Turn {current_turn_number}>
-Based on the history below, generate a situation description and user prompt that escalates, reacts to, or builds upon the events of the previous turns, incorporating the user's last response. Ensure you are incorporating the elements of the simulation history. If there is a danger in the situation that the user does not address or provides a poor solution for, the severity of that danger should escalate or come closer to being realized. If the user addresses the situation in a quality manner, the danger should be mitigated or resolved, but other foreseen or unforeseen absurdities should be introduced. The new situation should be a direct outcome based on the user's last response and the previous history - customize the situation to the user's response.
+Based on the history below, generate a situation description and user prompt that escalates, reacts to, or builds upon the events of the previous turns, incorporating the user's last response. Ensure you are incorporating the elements of the simulation history. If there is a danger in the situation that the user does not address or provides a poor solution for, the severity of that danger should escalate or come closer to being realized. If the user addresses the situation in a quality manner, the danger should be mitigated or resolved, but other foreseen or unintended consequences could be introduced, however major or minor. The new situation should be a direct outcome based on the user's last response and the previous history - customize the situation to the user's response.
 </Task for Turn {current_turn_number}>
 
 <Example Scenarios>
+
 Example 1:
-Turn 1:
-  "situation_description": "Every laugh triggers a localized tremor—'laughquakes'—because seismic sensors have been attuned to human giggle frequencies. Comedy shows have inadvertently become disaster zones.",
-  "user_prompt": "Your 'GiggleMute' dampeners use phase-inverted seismic waves tuned to human laughter frequencies to cancel laughquakes—how will you deploy and calibrate them in urban centers?"
-
-User Response:
-"I'll deploy GiggleMute dampeners in concentric rings around comedy venues, starting with major clubs in downtown areas. Each dampener will be calibrated to the specific giggle frequency of that neighborhood's population using laughter samples collected from local social media. For immediate relief, I'll establish mobile GiggleMute units that can rapidly respond to spontaneous outbreaks of humor. To prevent panic, I'll launch a public awareness campaign called "Chuckle Responsibly" that encourages people to laugh in designated safe zones until the system is fully operational."
-
-Output:
-{{
-  "situation_description": "Your GiggleMute dampeners have successfully neutralized the laughquakes, but the concentrated giggle energy is now condensing in the atmosphere, forming joke-saturated rain clouds that shower punchlines onto unsuspecting pedestrians, causing uncontrollable fits of laughter.",
-  "user_prompt": "How will you modify your GiggleMute technology to address these humor-laden precipitation events while maintaining earthquake prevention?"
-  "rationale": "Transforms the solution into a new problem with a logical connection to the original crisis, maintaining the absurdity while providing a clear path forward."
-}}
-
-Example 2:
 Turn 1:
   "situation_description": "Shadows have detached from their owners and begun roaming freely, absorbing sunlight and plunging regions into unexpected darkness.",
   "user_prompt": "You have a 'PhotonReattach Ray' that emits phase-aligned light pulses to bind shadows back to their owners—how will you map the dark zones and deploy the rays to restore daylight?"
@@ -285,7 +248,7 @@ After deploying the 'Forecast Filter' technology, the swirling vortex billboards
 
 As the Meteorological Marketing Mediator, how will you negotiate the 'Memorandum of Mesmerization' to balance the needs of the weather forecasting consortium, the migratory birds, and urban communication systems?
 
-Reason it is low quality: The scenario escalates the problem without providing a clear solution path for the user. The user is left with a difficult negotiation that doesn't have a clear win condition. It overall is just confusing. 
+Reason it is low quality: The scenario escalates the problem without providing a clear solution path for the user. The user is left with a difficult negotiation that doesn't have a clear win condition. It overall is just confusing.
 </low quality scenarios you have generated>
 
 <FULL SIMULATION HISTORY>
@@ -353,8 +316,8 @@ Based on the **entire history** above, generate a conclusion scenario that:
 1. Creates a RESOLUTION to the entire crisis arc that shows the final outcome of all previous events and the user's last response, highlighting the long-term consequences of the user's actions throughout the simulation and how the world persists.
 2. Shows the long-term consequences of the user's actions throughout the simulation and how the world returns to a new (but still absurd) normal.
 3. Based on how well the user has done over the past turns, the situation could completely resolve back to normal, or there could be externalities that persist because it either wasn't fully resolved or a response they used created some sort of longer lasting effect. The level of resolution to the final scenario should depend upon the quality of the previous responses and how well they addressed the situations presented.
-4. Incorporates the elements of the simulation history and the user's last response. 
-5. Realizes the negative consequences if the user does not address or provides a poor solution for the problem in the situation. 
+4. Incorporates the elements of the simulation history and the user's last response.
+5. Realizes the negative consequences if the user does not address or provides a poor solution for the problem in the situation.
 6. Mitigates the negative consequences the user addresses the situation in a quality manner.
 7. **Critically important:** Provide a final grade between 1-100 that evaluates the quality of the user's responses throughout the simulation. Consider:
    - Logical coherence and effectiveness of responses
@@ -454,10 +417,10 @@ def get_formatted_prompt_template(current_turn_number, max_turns):
     """
   if current_turn_number == 1:
     return INITIAL_GENERATION_TEMPLATE
-  elif current_turn_number == max_turns:
-    # For turn 4, we still use TURN_GENERATION_TEMPLATE to show user_prompt
-    # The FINAL_TURN_TEMPLATE is selected directly in LLM service when generating conclusion
-    return TURN_GENERATION_TEMPLATE
   else:
-    # Use regular turn template for turns 2, 3, and 4
+    # Use TURN_GENERATION_TEMPLATE for all other playable turns (2, 3, etc.)
+    # IMPORTANT: We do NOT return FINAL_TURN_TEMPLATE here for turn 3
+    # The FINAL_TURN_TEMPLATE is selected directly in the LLM service 
+    # when is_conclusion_generation=True (after the final user response)
+    # This ensures turn 3 (when max_turns=3) still shows user_prompt
     return TURN_GENERATION_TEMPLATE
