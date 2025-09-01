@@ -445,20 +445,23 @@ export default function SimulationPage({ initialScenario }) {
         backgroundColor: "rgba(0, 0, 0, 0.95)",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
         alignItems: "center",
         zIndex: 1000,
         padding: "20px",
         fontFamily: '"Press Start 2P", cursive',
+        overflowY: "hidden",
       }}>
         <div style={{
           maxWidth: "900px",
           width: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
           backgroundColor: "#1a1a1a",
           border: "3px solid #00ff00",
           borderRadius: "10px",
           padding: "30px",
           boxShadow: "0 0 30px rgba(0, 255, 0, 0.5)",
+          margin: "auto",
         }}>
           <h2 style={{
             color: "#00ff00",
@@ -492,23 +495,13 @@ export default function SimulationPage({ initialScenario }) {
             </div>
           )}
           
-          {/* Conclusion Audio with Controls */}
+          {/* Conclusion Audio - Hidden but autoplaying */}
           {conclusionData.audioUrl && (
-            <div style={{
-              marginBottom: "20px",
-              display: "flex",
-              justifyContent: "center",
-            }}>
-              <audio
-                src={conclusionData.audioUrl}
-                autoPlay
-                controls
-                style={{
-                  width: "300px",
-                  height: "40px",
-                }}
-              />
-            </div>
+            <audio
+              src={conclusionData.audioUrl}
+              autoPlay
+              style={{ display: "none" }}
+            />
           )}
           
           {/* Conclusion Scenario */}
