@@ -52,8 +52,9 @@ class SimulationTurn(BaseModel):
 class SimulationState(BaseModel):
     """Model representing the complete state of a simulation."""
     simulation_id: str = Field(default_factory=lambda: f"sim_{datetime.now().strftime('%Y%m%d%H%M%S')}")
-    current_turn_number: int = 1
-    max_turns: int = 3
+    current_turn_number: int = 1  # Keeping for backward compatibility temporarily
+    submission_count: int = 0  # NEW: Counter that increments on each POST request
+    max_turns: int = 3  # Configurable max submissions before conclusion
     turns: List[SimulationTurn] = []
     is_complete: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
@@ -167,8 +168,7 @@ class SimulationState(BaseModel):
             # If this isn't the last turn, increment the current turn
             if turn_number < self.max_turns:
                 self.current_turn_number = turn_number + 1
-            else:
-                self.is_complete = True
+            # Note: is_complete is set in simulation_service.py when processing final turn
 
             self.updated_at = datetime.now()
 

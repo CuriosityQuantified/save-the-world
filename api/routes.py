@@ -95,12 +95,39 @@ async def submit_response(
         
         # Notify WebSocket clients about the update
         if simulation_id in active_connections:
+            # Check if this is a conclusion (has grade in latest scenario)
+            current_turn = simulation.current_turn_number
+            current_scenario = None
+            
+            # If simulation is complete, check for conclusion at turn+1 (turn 4)
+            # Otherwise check the current turn
+            check_turn = current_turn + 1 if simulation.is_complete else current_turn
+            
+            # Find the turn with matching turn_number (turns is a list, not a dict)
+            turn_data = next((t for t in simulation.turns if t.turn_number == check_turn), None)
+            if turn_data and turn_data.selected_scenario:
+                current_scenario = turn_data.selected_scenario
+                logger.info(f"[WEBSOCKET] Found scenario at turn {check_turn}, has grade: {hasattr(current_scenario, 'grade') and current_scenario.grade is not None}")
+            
+            is_conclusion = current_scenario and hasattr(current_scenario, 'grade') and current_scenario.grade is not None
+            
+            if is_conclusion:
+                logger.info(f"[WEBSOCKET] 🎯 Sending CONCLUSION update for simulation {simulation_id}, turn {current_turn}, grade: {current_scenario.grade}")
+            elif current_turn == simulation.max_turns:
+                logger.info(f"[WEBSOCKET] [TURN {current_turn}] Sending update for turn {current_turn}/{simulation.max_turns} (is_conclusion: {is_conclusion})")
+            else:
+                logger.info(f"[WEBSOCKET] Sending update for simulation {simulation_id}, turn {current_turn}")
+            
             for connection in active_connections[simulation_id]:
                 try:
-                    await connection.send_text(json.dumps({
+                    message_data = {
                         "type": "simulation_updated",
                         "simulation": simulation.dict()
-                    }, cls=DateTimeEncoder))
+                    }
+                    await connection.send_text(json.dumps(message_data, cls=DateTimeEncoder))
+                    
+                    if is_conclusion:
+                        logger.info(f"[WEBSOCKET] ✅ Conclusion message sent successfully to client")
                 except Exception as e:
                     logger.error(f"Error sending WebSocket update: {str(e)}")
         
@@ -132,12 +159,39 @@ async def toggle_developer_mode(
         
         # Notify WebSocket clients about the update
         if simulation_id in active_connections:
+            # Check if this is a conclusion (has grade in latest scenario)
+            current_turn = simulation.current_turn_number
+            current_scenario = None
+            
+            # If simulation is complete, check for conclusion at turn+1 (turn 4)
+            # Otherwise check the current turn
+            check_turn = current_turn + 1 if simulation.is_complete else current_turn
+            
+            # Find the turn with matching turn_number (turns is a list, not a dict)
+            turn_data = next((t for t in simulation.turns if t.turn_number == check_turn), None)
+            if turn_data and turn_data.selected_scenario:
+                current_scenario = turn_data.selected_scenario
+                logger.info(f"[WEBSOCKET] Found scenario at turn {check_turn}, has grade: {hasattr(current_scenario, 'grade') and current_scenario.grade is not None}")
+            
+            is_conclusion = current_scenario and hasattr(current_scenario, 'grade') and current_scenario.grade is not None
+            
+            if is_conclusion:
+                logger.info(f"[WEBSOCKET] 🎯 Sending CONCLUSION update for simulation {simulation_id}, turn {current_turn}, grade: {current_scenario.grade}")
+            elif current_turn == simulation.max_turns:
+                logger.info(f"[WEBSOCKET] [TURN {current_turn}] Sending update for turn {current_turn}/{simulation.max_turns} (is_conclusion: {is_conclusion})")
+            else:
+                logger.info(f"[WEBSOCKET] Sending update for simulation {simulation_id}, turn {current_turn}")
+            
             for connection in active_connections[simulation_id]:
                 try:
-                    await connection.send_text(json.dumps({
+                    message_data = {
                         "type": "simulation_updated",
                         "simulation": simulation.dict()
-                    }, cls=DateTimeEncoder))
+                    }
+                    await connection.send_text(json.dumps(message_data, cls=DateTimeEncoder))
+                    
+                    if is_conclusion:
+                        logger.info(f"[WEBSOCKET] ✅ Conclusion message sent successfully to client")
                 except Exception as e:
                     logger.error(f"Error sending WebSocket update: {str(e)}")
         

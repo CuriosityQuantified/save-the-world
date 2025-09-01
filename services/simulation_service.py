@@ -179,7 +179,12 @@ class SimulationService:
                 logger.error(f"Simulation not found: {simulation_id}")
                 return None
 
-            # Get the current turn number
+            # Increment submission counter on each POST
+            simulation.submission_count += 1
+            logger.info(f"[SUBMISSION] POST #{simulation.submission_count} received (max: {simulation.max_turns})")
+            logger.info(f"[SUBMISSION] User response: '{user_response[:100]}...'")
+
+            # Get the current turn number for storing response
             current_turn = simulation.current_turn_number
 
             # Add the user response to the current turn
@@ -190,12 +195,15 @@ class SimulationService:
                 self.state_service.update_simulation(simulation)
                 return simulation
 
-            # Determine if this was the final playable turn that the user just responded to
-            is_final_user_turn_completed = current_turn == simulation.max_turns
+            # Check if we've reached max submissions for conclusion
+            should_generate_conclusion = simulation.submission_count >= simulation.max_turns
+            
+            logger.info(f"[SUBMISSION] Check: submission_count({simulation.submission_count}) >= max_turns({simulation.max_turns}) = {should_generate_conclusion}")
 
-            if is_final_user_turn_completed:
-                # Generate the CONCLUSION turn using the final turn template
-                logger.info(f"User just completed final turn {current_turn}. Generating conclusion now.")
+            if should_generate_conclusion:
+                # Generate the CONCLUSION after max submissions reached
+                logger.info(f"🎯 [CONCLUSION] Submission #{simulation.submission_count} reached max_turns({simulation.max_turns}). Generating conclusion with grade now.")
+                logger.info(f"[CONCLUSION] Setting up context for conclusion generation...")
 
                 context = {
                     "simulation_history": simulation.get_history_text(),
@@ -204,24 +212,41 @@ class SimulationService:
                     "user_prompt_for_this_turn": user_response,  # Pass the user's final response
                     "max_turns": simulation.max_turns
                 }
-                # Mark as complete since this was the final turn response
+                
+                logger.info(f"[CONCLUSION] Context prepared: turn={context['current_turn_number']}, has_user_prompt={bool(context['user_prompt_for_this_turn'])}")
+                
+                # Mark as complete since we've reached max submissions
                 simulation.is_complete = True
-                logger.info(f"Simulation {simulation_id} marked as complete after final user response at turn {current_turn}.")
+                logger.info(f"[CONCLUSION] Simulation {simulation_id} marked as complete (is_complete=True)")
             else:
                 # Generate the NEXT REGULAR turn's scenarios
                 next_regular_turn = current_turn + 1
-                simulation.current_turn_number = next_regular_turn
-
-                logger.info(f"Processing response for turn {current_turn}/{simulation.max_turns}. Generating next scenario for turn {next_regular_turn}.")
-
-                context = {
-                    "simulation_history": simulation.get_history_text(),
-                    "current_turn_number": next_regular_turn,
-                    "previous_turn_number": current_turn,
-                    "user_prompt_for_this_turn": "", # Default for regular next turn
-                    "max_turns": simulation.max_turns
-                }
-                # is_complete remains False
+                
+                # Safety check: Never generate beyond max_turns
+                if next_regular_turn > simulation.max_turns:
+                    logger.error(f"[ERROR] Attempting to generate turn {next_regular_turn} when max_turns is {simulation.max_turns}. Forcing conclusion.")
+                    # Force conclusion generation
+                    simulation.is_complete = True
+                    context = {
+                        "simulation_history": simulation.get_history_text(),
+                        "current_turn_number": current_turn,
+                        "previous_turn_number": current_turn - 1,
+                        "user_prompt_for_this_turn": user_response,
+                        "max_turns": simulation.max_turns
+                    }
+                    logger.info(f"[CONCLUSION] Forced conclusion generation due to turn overflow")
+                else:
+                    simulation.current_turn_number = next_regular_turn
+                    logger.info(f"[SUBMISSION] Submission #{simulation.submission_count}: Generating next scenario for turn {next_regular_turn}.")
+                    
+                    context = {
+                        "simulation_history": simulation.get_history_text(),
+                        "current_turn_number": next_regular_turn,
+                        "previous_turn_number": current_turn,
+                        "user_prompt_for_this_turn": "", # Default for regular next turn
+                        "max_turns": simulation.max_turns
+                    }
+                    # is_complete remains False
 
             # Add the updated simulation to state service before generating the next scenario
             # This ensures the user response and current_turn_number update are saved
@@ -237,6 +262,12 @@ class SimulationService:
                 scenario_id = scenario.get("id", f"scenario_{simulation.current_turn_number}_1")
                 logger.info(f"Scenario ID: {scenario_id}")
                 logger.debug(f"Scenario Description: {scenario.get('situation_description', '')[:50]}...")
+                
+                # Debug: Log if grade is present in raw scenario
+                if "grade" in scenario:
+                    logger.info(f"[DEBUG] ✅ Grade found in raw scenario: {scenario.get('grade')}")
+                else:
+                    logger.info(f"[DEBUG] ❌ No grade in raw scenario. Keys: {list(scenario.keys())}")
 
                 # Ensure all required fields exist with defaults if missing
                 description = scenario.get("situation_description", f"Default scenario for turn {simulation.current_turn_number}")
@@ -253,33 +284,47 @@ class SimulationService:
                 }
                 if "user_role" in scenario: scenario_model_fields["user_role"] = scenario["user_role"]
                 if "user_prompt" in scenario: scenario_model_fields["user_prompt"] = scenario["user_prompt"]
-                if "grade" in scenario: scenario_model_fields["grade"] = scenario["grade"]
-                if "grade_explanation" in scenario: scenario_model_fields["grade_explanation"] = scenario["grade_explanation"]
+                if "grade" in scenario: 
+                    scenario_model_fields["grade"] = scenario["grade"]
+                    logger.info(f"[CONCLUSION] ✅ Grade found in scenario: {scenario['grade']}/100")
+                if "grade_explanation" in scenario: 
+                    scenario_model_fields["grade_explanation"] = scenario["grade_explanation"]
+                    logger.info(f"[CONCLUSION] Grade explanation: {scenario['grade_explanation'][:100]}...")
+                
+                # Log if this is a conclusion scenario
+                if "grade" in scenario:
+                    logger.info(f"[CONCLUSION] 🎯 Creating conclusion scenario model with grade")
+                else:
+                    logger.info(f"[TURN {simulation.current_turn_number}] Creating regular scenario model (no grade)")
 
                 scenario_model = Scenario(**scenario_model_fields)
 
+                # CRITICAL FIX: Store conclusion at turn 4 to avoid overwriting turn 3
+                # If this is a conclusion (has grade), store it at turn_number + 1
+                storage_turn = simulation.current_turn_number
+                if "grade" in scenario:
+                    storage_turn = simulation.current_turn_number + 1  # Store conclusion at turn 4
+                    logger.info(f"[CONCLUSION] Storing conclusion at turn {storage_turn} (avoiding overwrite of turn {simulation.current_turn_number})")
+
                 # Add the scenario to the simulation
-                simulation.add_scenarios(simulation.current_turn_number, [scenario_model])
+                simulation.add_scenarios(storage_turn, [scenario_model])
 
                 # Automatically select the scenario
-                simulation.select_scenario(simulation.current_turn_number, scenario_id)
+                simulation.select_scenario(storage_turn, scenario_id)
 
                 # Generate media prompts - video prompt only
-                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=simulation.current_turn_number)
+                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=storage_turn)
 
                 # Add media prompts to the simulation state - set narration_script to None
-                simulation.add_media_prompts(simulation.current_turn_number, video_prompt, None)
+                simulation.add_media_prompts(storage_turn, video_prompt, None)
 
                 # Generate media (video and audio in parallel) - THIS WILL RUN FOR CONCLUSION TURN TOO
-                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=simulation.current_turn_number)
+                media_results = await self.media_service.generate_media_parallel(scenario, video_prompt, turn=storage_turn)
 
                 # Add media URLs to the simulation state
-                simulation.add_media_urls(simulation.current_turn_number, media_results['video_urls'], media_results['audio_url'])
+                simulation.add_media_urls(storage_turn, media_results['video_urls'], media_results['audio_url'])
 
-                # Set simulation as complete if this was the conclusion turn generation
-                if is_final_user_turn_completed:
-                    simulation.is_complete = True
-                    logger.info(f"Simulation {simulation_id} marked as complete after generating conclusion for turn {simulation.current_turn_number}.")
+                # No need to set is_complete here - it's already set above when conclusion is triggered
 
             except Exception as scenario_error:
                 logger.error(f"Error processing scenario for turn {simulation.current_turn_number}: {str(scenario_error)}")
@@ -290,8 +335,8 @@ class SimulationService:
                     "situation_description": f"Communication issues have affected our analysis systems. Please provide your assessment based on previous information.",
                     "rationale": "System-generated fallback due to processing error",
                 }
-                # If it's not a conclusion, add role/prompt
-                if not is_final_user_turn_completed:
+                # If it's not a conclusion (check if is_complete was set), add role/prompt
+                if not simulation.is_complete:
                     fallback_scenario_fields["user_role"] = ""
                     fallback_scenario_fields["user_prompt"] = "How would you address the ongoing situation given the information available to you?"
                 else: # Fallback for a conclusion turn might include a default grade
@@ -309,9 +354,8 @@ class SimulationService:
                 simulation.add_media_urls(simulation.current_turn_number, [], None)
                 logger.info(f"Added fallback scenario and empty media for turn {simulation.current_turn_number}.")
 
-                # If conclusion generation failed, still mark simulation as complete
-                if is_final_user_turn_completed:
-                    simulation.is_complete = True
+                # Log if simulation was marked as complete for conclusion
+                if simulation.is_complete:
                     logger.info(f"Simulation {simulation_id} marked as complete even after fallback for conclusion turn {simulation.current_turn_number}.")
 
             # Update the simulation in the state service

@@ -8,8 +8,9 @@ export default function SimulationPage({ initialScenario }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turn, setTurn] = useState(0);
-  const [MAX_TURNS, setMAX_TURNS] = useState(3);
-  const [userTurn, setUserTurn] = useState(0);  // Track actual user submissions
+  // These values now come from backend
+  const [maxTurns, setMaxTurns] = useState(3);
+  const [submissionCount, setSubmissionCount] = useState(0);
   const [userInput, setUserInput] = useState("");
 
   // State for media URLs received from the backend
@@ -54,20 +55,49 @@ export default function SimulationPage({ initialScenario }) {
       if (message.type === "simulation_state" || message.type === "simulation_updated") {
         // Get the current turn data
         const currentTurnNumber = message.simulation.current_turn_number || 1;
-        const currentTurn = message.simulation.turns?.find(t => t.turn_number === currentTurnNumber);
+        
+        // CRITICAL: If simulation is complete, conclusion is stored at turn+1 (turn 4)
+        const checkTurn = message.simulation.is_complete ? currentTurnNumber + 1 : currentTurnNumber;
+        const currentTurn = message.simulation.turns?.find(t => t.turn_number === checkTurn);
+        
+        console.log(`[DEBUG] Looking for turn data at turn ${checkTurn} (is_complete: ${message.simulation.is_complete})`);
+        
+        // Update frontend state from backend
+        setMaxTurns(message.simulation.max_turns || 3);
+        setSubmissionCount(message.simulation.submission_count || 0);
+        
+        // Special logging for final turn
+        if (currentTurnNumber === message.simulation.max_turns) {
+          console.log(`[FINAL TURN] [WEBSOCKET] 🔵 Received update for Turn ${currentTurnNumber}`);
+          console.log(`[FINAL TURN] Current turn data:`, currentTurn);
+          console.log(`[FINAL TURN] is_complete: ${message.simulation.is_complete}`);
+          console.log(`[FINAL TURN] submission_count: ${message.simulation.submission_count}/${message.simulation.max_turns}`);
+          if (currentTurn?.selected_scenario) {
+            console.log(`[FINAL TURN] Selected scenario has grade?: ${currentTurn.selected_scenario.grade !== undefined}`);
+            if (currentTurn.selected_scenario.grade !== undefined) {
+              console.log(`[FINAL TURN] 🎯 CONCLUSION DETECTED! Grade: ${currentTurn.selected_scenario.grade}/100`);
+            }
+          }
+        }
+        
+        // Extract media URLs first (before they're used in conclusion data)
+        const videoUrls = currentTurn?.video_urls || message.simulation.video_urls || [];
+        const audioUrl = currentTurn?.audio_url || message.simulation.audio_url || null;
         
         // Extract all scenario parts and format them properly
         const scenario = currentTurn?.selected_scenario;
         let scenarioDisplay = "";
         if (scenario) {
           scenarioDisplay = scenario.situation_description || "";
-          // Only include user_role for the very first turn (userTurn === 0)
-          if (scenario.user_role && userTurn === 0) {
+          // Only include user_role for the very first turn (submissionCount === 0)
+          if (scenario.user_role && submissionCount === 0) {
             scenarioDisplay += "\n\n" + scenario.user_role;
           }
           // Check for conclusion (grade present)
+          console.log(`[DEBUG] Checking for conclusion - grade: ${scenario.grade}, turn: ${currentTurnNumber}`);
           if (scenario.grade !== undefined && scenario.grade !== null) {
             // This is a conclusion scenario
+            console.log(`[DEBUG] 🎯 CONCLUSION DETECTED! Grade: ${scenario.grade}/100`);
             setConclusionData({
               scenario: scenarioDisplay,
               grade: scenario.grade,
@@ -77,6 +107,7 @@ export default function SimulationPage({ initialScenario }) {
             });
             setShowConclusion(true);
           } else if (scenario.user_prompt) {
+            console.log(`[DEBUG] Regular turn ${currentTurnNumber} - User prompt present`);
             // Regular turn with user prompt
             scenarioDisplay += "\n\n" + scenario.user_prompt;
           }
@@ -94,8 +125,6 @@ export default function SimulationPage({ initialScenario }) {
           }
           return prev;
         });
-        const videoUrls = currentTurn?.video_urls || message.simulation.video_urls || [];
-        const audioUrl = currentTurn?.audio_url || message.simulation.audio_url || null;
         
         setCurrentVideoUrls(videoUrls);
         setCurrentAudioUrl(audioUrl);
@@ -107,7 +136,15 @@ export default function SimulationPage({ initialScenario }) {
         // Removed duplicate setHistory - scenario already added above with all fields
 
         // Hide loading after a delay to allow seeing final checkmarks
-        setTimeout(() => setIsLoading(false), 1000);
+        console.log(`[STATE] Setting isLoading to false after 1 second delay (turn ${currentTurnNumber})`);
+        setTimeout(() => {
+          setIsLoading(false);
+          console.log(`[STATE] isLoading set to false (turn ${currentTurnNumber})`);
+          if (submissionCount >= message.simulation.max_turns - 1) {
+            console.log(`[FINAL TURN] [STATE] 🟢 isLoading is now FALSE - submit button should be enabled`);
+            console.log(`[FINAL TURN] [STATE] Current states: turn=${currentTurnNumber}, submissions=${submissionCount}/${message.simulation.max_turns}, isLoading=false, showConclusion=${scenario?.grade !== undefined}`);
+          }
+        }, 1000);
 
       } else if (message.type === "progress_update") {
         console.log(`React: Progress update received for step: ${message.step}`);
@@ -143,15 +180,34 @@ export default function SimulationPage({ initialScenario }) {
   // Function to handle user response submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userInput.trim() || isLoading || turn > MAX_TURNS) return;
+    
+    // Debug logging for turn 3 submission tracking
+    console.log(`[DEBUG] handleSubmit called - Turn: ${turn}/${maxTurns}, Submissions: ${submissionCount}/${maxTurns}, Loading: ${isLoading}`);
+    console.log(`[DEBUG] User input: "${userInput}", SimulationId: ${simulationId}`);
+    
+    // Check submission conditions
+    if (!userInput.trim()) {
+      console.log("[DEBUG] Submission blocked: Empty input");
+      return;
+    }
+    if (isLoading) {
+      console.log("[DEBUG] Submission blocked: Already loading");
+      return;
+    }
+    // Let backend handle submission count validation
+    if (submissionCount >= maxTurns && !showConclusion) {
+      console.log(`[DEBUG] Submission blocked: Already reached max submissions ${submissionCount}/${maxTurns}`);
+      return;
+    }
+    
+    console.log(`[DEBUG] ✅ Submission proceeding for turn ${turn}`);
 
     setIsLoading(true);
     setScenarioGenerated(false);
     setVideosGenerated(false);
     setAudioGenerated(false);
     
-    // Increment userTurn counter after first submission
-    setUserTurn(prev => prev + 1);
+    // Backend will increment submission counter
 
     const currentInput = userInput;
     // Update history immediately for user feedback
@@ -161,6 +217,7 @@ export default function SimulationPage({ initialScenario }) {
     try {
       // Ensure simulationId is available before making the call
       if (!simulationId) {
+        console.error("[DEBUG] ERROR: Simulation ID is not set. Cannot submit response.");
         throw new Error("Simulation ID is not set. Cannot submit response.");
       }
 
@@ -168,29 +225,46 @@ export default function SimulationPage({ initialScenario }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
+      // Log the request details
+      const requestUrl = `http://localhost:8000/simulations/${simulationId}/respond`;
+      const requestBody = { response_text: currentInput };
+      console.log(`[DEBUG] Making POST request to: ${requestUrl}`);
+      console.log(`[DEBUG] Request body:`, requestBody);
+      console.log(`[DEBUG] This is submission #${submissionCount + 1} (conclusion triggers at ${maxTurns})`);
+      
       // Call backend directly to avoid proxy timeout issues
-      const response = await fetch(`http://localhost:8000/simulations/${simulationId}/respond`, { // NEW: Use respond endpoint
+      const response = await fetch(requestUrl, { // NEW: Use respond endpoint
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ // NEW: Body according to UserResponseRequest model
-           response_text: currentInput 
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal // Add abort signal for timeout
       });
       
       clearTimeout(timeoutId); // Clear timeout if request completes
+      console.log(`[DEBUG] Response received: Status ${response.status}`);
 
       if (!response.ok) {
         const errorData = await response.text();
+        console.error(`[DEBUG] ERROR: HTTP error! status: ${response.status}, ${errorData}`);
         throw new Error(`HTTP error! status: ${response.status}, ${errorData}`);
       }
+      
+      console.log(`[DEBUG] ✅ Turn ${turn} response submitted successfully`);
       // Backend will now send simulation_state/progress_updates via WebSocket.
       // The setIsLoading(false) will be handled by the WebSocket onmessage handler.
       // const data = await response.json(); // No longer need to process data here directly for UI updates
 
     } catch (error) {
-      console.error("Error fetching next turn:", error);
-      setError(`Error advancing simulation: ${error.message}`);
+      console.error(`[DEBUG] Error on turn ${turn} submission:`, error);
+      console.error("[DEBUG] Error details:", {
+        turn: turn,
+        maxTurns: maxTurns,
+        simulationId: simulationId,
+        userInput: currentInput,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
+      setError(`Error advancing simulation on turn ${turn}: ${error.message}`);
       setIsLoading(false); // Ensure loading is false on error
     }
   };
@@ -203,6 +277,23 @@ export default function SimulationPage({ initialScenario }) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [history, isLoading]);
+  
+  // Track submit button state for Turn 3
+  useEffect(() => {
+    const isDisabled = isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId;
+    if (submissionCount === maxTurns - 1) {
+      console.log(`[FINAL SUBMISSION] [BUTTON STATE] 🔍 Submit button state check:`);
+      console.log(`[FINAL SUBMISSION] - isLoading: ${isLoading}`);
+      console.log(`[FINAL SUBMISSION] - submissions: ${submissionCount}/${maxTurns}`);
+      console.log(`[FINAL SUBMISSION] - !simulationId: ${!simulationId} (id: ${simulationId})`);
+      console.log(`[FINAL SUBMISSION] - Button disabled: ${isDisabled}`);
+      if (!isDisabled) {
+        console.log(`[FINAL SUBMISSION] 🟢 Submit button SHOULD BE ENABLED - user can submit`);
+      } else {
+        console.log(`[FINAL SUBMISSION] 🔴 Submit button IS DISABLED - user CANNOT submit`);
+      }
+    }
+  }, [isLoading, turn, maxTurns, submissionCount, simulationId, showConclusion]);
 
   const initializeSimulation = async () => {
     setIsLoading(true);
@@ -605,7 +696,7 @@ export default function SimulationPage({ initialScenario }) {
           fontSize: "0.8em",
           fontFamily: '"Press Start 2P", cursive',
         }}>
-          TURN {Math.min(turn > 0 ? turn : 1, MAX_TURNS)}/{MAX_TURNS}
+          TURN {Math.min(turn > 0 ? turn : 1, maxTurns)}/{maxTurns}
         </div>
 
         {/* Content Grid */}
@@ -719,8 +810,8 @@ export default function SimulationPage({ initialScenario }) {
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={turn > MAX_TURNS ? "Simulation ended." : !simulationId ? "Start a simulation first..." : "Your response..."}
-            disabled={isLoading || turn > MAX_TURNS || !simulationId}
+            placeholder={(submissionCount >= maxTurns && !showConclusion) ? "Simulation ended." : !simulationId ? "Start a simulation first..." : "Your response..."}
+            disabled={isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId}
             style={{
               flexGrow: 1,
               padding: "10px",
@@ -732,7 +823,7 @@ export default function SimulationPage({ initialScenario }) {
               fontSize: "0.8em",
             }}
           />
-          <button type="submit" disabled={isLoading || turn > MAX_TURNS || !simulationId} style={{
+          <button type="submit" disabled={isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId} style={{
             padding: "10px 15px",
             borderRadius: "5px",
             border: "none",
@@ -741,7 +832,7 @@ export default function SimulationPage({ initialScenario }) {
             cursor: "pointer",
             fontFamily: 'inherit',
             fontSize: "0.8em",
-            opacity: (isLoading || turn > MAX_TURNS || !simulationId) ? 0.5 : 1,
+            opacity: (isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId) ? 0.5 : 1,
           }}>
             Send
           </button>

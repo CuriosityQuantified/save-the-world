@@ -48,7 +48,7 @@ class LLMService:
     """
     Service for handling interactions with Language Models.
 
-    Provides methods for scenario generation, video prompt creation, 
+    Provides methods for scenario generation, video prompt creation,
     and narration script creation.
     """
 
@@ -137,7 +137,7 @@ class LLMService:
             # Force use of moonshotai/kimi-k2-instruct regardless of requested model
             actual_model = "moonshotai/kimi-k2-instruct"
             config = self.model_configs.get(actual_model, {"temperature": 1.0})
-            
+
             self.llm_instances[model_name] = ChatGroq(
                 model_name=actual_model,
                 groq_api_key=self.groq_api_key,
@@ -213,18 +213,21 @@ class LLMService:
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
 
-        # Determine if this is the final turn FOR CONCLUSION generation 
+        # Determine if this is the final turn FOR CONCLUSION generation
         # This now happens when:
         # 1. The current turn number equals max_turns (we're on turn 3 of 3)
         # 2. AND we have a user response for this turn (user_prompt_for_this_turn is not empty)
         is_conclusion_generation = (current_turn_number == max_turns and user_prompt_for_this_turn)
 
-        logger.info(f"Turn: {current_turn_number}/{max_turns}, User response: {'Yes' if user_prompt_for_this_turn else 'No'}, Conclusion: {'Yes' if is_conclusion_generation else 'No'}")
+        logger.info(f"[DEBUG] Turn: {current_turn_number}/{max_turns}, User response: {'Yes' if user_prompt_for_this_turn else 'No'}, Conclusion: {'Yes' if is_conclusion_generation else 'No'}")
+        if user_prompt_for_this_turn:
+            logger.info(f"[DEBUG] User prompt content: '{user_prompt_for_this_turn[:50]}...'")
+        logger.info(f"[DEBUG] Conclusion conditions: current_turn({current_turn_number}) == max_turns({max_turns})? {current_turn_number == max_turns}, user_prompt? {bool(user_prompt_for_this_turn)}")
 
         # Model selection: Always use moonshotai/kimi-k2-instruct
         models_to_try = ["moonshotai/kimi-k2-instruct"]
         if is_conclusion_generation:
-            logger.info(f"Generating CONCLUSION for turn {current_turn_number} (final turn with user response)")
+            logger.info(f"🎯 [CONCLUSION] Generating CONCLUSION for turn {current_turn_number}/{max_turns} (final turn with user response)")
         else:
             logger.info(f"Generating normal scenario for turn {current_turn_number}/{max_turns}")
 
@@ -478,7 +481,7 @@ class LLMService:
                     f"JSONDecodeError: {str(e)} - Raw: {raw_llm_output[:1000]} - Processed: {json_str[:3500]}",
                     {},
                     model_used,
-                    response_time 
+                    response_time
                 )
                 return [] # Return empty list on JSON decode error
 
@@ -594,7 +597,7 @@ class LLMService:
                     # Not typically expecting a list from this fallback, but handle if it occurs
                     elif isinstance(data, list) and data:
                          logger.info(f"Successfully parsed substring as JSON list (count: {len(data)}). Taking first element.")
-                         return [self._validate_scenario(data[0], current_turn_number, 1)] 
+                         return [self._validate_scenario(data[0], current_turn_number, 1)]
                     else:
                         logger.warning(f"Substring parsed to {type(data)}, not dict or non-empty list.")
                         raise json.JSONDecodeError("Substring parse resulted in unexpected type", potential_json_object_str, 0)
@@ -663,7 +666,7 @@ class LLMService:
         # Determine if this is the final turn (for streamlined conclusion structure)
         # Conclusion structure applies only AFTER the last playable turn.
         max_turns_value = 3 # Default max_turns is 3 - conclusion is generated after turn 3
-        is_final_turn_for_structure = current_turn_number > max_turns_value 
+        is_final_turn_for_structure = current_turn_number >= max_turns_value
 
         # For non-final turns (turns 1, 2, 3), include user_role and user_prompt
         user_role = None
@@ -766,8 +769,8 @@ class LLMService:
         return self.scenarios_dict.get(scenario_id)
 
     async def generate_video_sequence_from_scenario(
-        self, 
-        scenario: Dict[str, str], 
+        self,
+        scenario: Dict[str, str],
         turn_number: int = 1
     ) -> List[str]:
         """
@@ -804,7 +807,7 @@ class LLMService:
         logger.info(f"Successfully obtained {len(scene_descriptions)} scene descriptions.")
 
         # Step 2: Parallel Video Generation and Upload for each scene
-        # HuggingFaceService's generate_video method already handles generation 
+        # HuggingFaceService's generate_video method already handles generation
         # and potential R2 upload, returning a URL.
         video_generation_tasks = []
         for i, description in enumerate(scene_descriptions):
@@ -827,7 +830,7 @@ class LLMService:
                     # If any video fails, we return an empty list as per current understanding
                     # Potentially log details of the exception result
                     # logger.error(traceback.format_exc(exception=result)) # If more detail needed
-                    return [] 
+                    return []
                 elif result is None:
                     logger.error(f"Video generation for scene {i+1} ('{scene_descriptions[i][:50]}...') returned None URL.")
                     return [] # If None URL, treat as failure
