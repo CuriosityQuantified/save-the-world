@@ -98,6 +98,8 @@ export default function SimulationPage({ initialScenario }) {
           if (scenario.grade !== undefined && scenario.grade !== null) {
             // This is a conclusion scenario
             console.log(`[DEBUG] 🎯 CONCLUSION DETECTED! Grade: ${scenario.grade}/100`);
+            console.log(`[DEBUG] Conclusion Audio URL: ${audioUrl}`);
+            console.log(`[DEBUG] Conclusion Video URLs:`, videoUrls);
             setConclusionData({
               scenario: scenarioDisplay,
               grade: scenario.grade,
@@ -483,6 +485,25 @@ export default function SimulationPage({ initialScenario }) {
                   height: "225px",
                   borderRadius: "5px",
                   border: "2px solid #444",
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Conclusion Audio with Controls */}
+          {conclusionData.audioUrl && (
+            <div style={{
+              marginBottom: "20px",
+              display: "flex",
+              justifyContent: "center",
+            }}>
+              <audio
+                src={conclusionData.audioUrl}
+                autoPlay
+                controls
+                style={{
+                  width: "300px",
+                  height: "40px",
                 }}
               />
             </div>
