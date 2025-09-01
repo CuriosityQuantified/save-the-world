@@ -100,6 +100,8 @@ export default function SimulationPage({ initialScenario }) {
             console.log(`[DEBUG] 🎯 CONCLUSION DETECTED! Grade: ${scenario.grade}/100`);
             console.log(`[DEBUG] Conclusion Audio URL: ${audioUrl}`);
             console.log(`[DEBUG] Conclusion Video URLs:`, videoUrls);
+            console.log(`[DEBUG] Full Grade Explanation Length: ${scenario.grade_explanation?.length || 0} characters`);
+            console.log(`[DEBUG] Full Grade Explanation:`, scenario.grade_explanation);
             setConclusionData({
               scenario: scenarioDisplay,
               grade: scenario.grade,
@@ -520,12 +522,28 @@ export default function SimulationPage({ initialScenario }) {
             <h3 style={{ color: "#66ff66", marginBottom: "10px", fontSize: "0.9em" }}>
               Final Assessment:
             </h3>
-            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em" }}>
+            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em", whiteSpace: "pre-wrap" }}>
               {conclusionData.scenario}
             </p>
           </div>
           
-          {/* Grade Display */}
+          {/* Performance Analysis - Moved before Grade Display */}
+          <div style={{
+            backgroundColor: "#2a2a2a",
+            padding: "20px",
+            borderRadius: "5px",
+            marginBottom: "20px",
+            border: "1px solid #444",
+          }}>
+            <h3 style={{ color: "#66ff66", marginBottom: "10px", fontSize: "0.9em" }}>
+              Performance Analysis:
+            </h3>
+            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em", whiteSpace: "pre-wrap" }}>
+              {conclusionData.gradeExplanation}
+            </p>
+          </div>
+          
+          {/* Grade Display - Now after Performance Analysis */}
           <div style={{
             textAlign: "center",
             marginBottom: "20px",
@@ -538,22 +556,6 @@ export default function SimulationPage({ initialScenario }) {
             }}>
               SCORE: {conclusionData.grade}/100
             </div>
-          </div>
-          
-          {/* Grade Explanation */}
-          <div style={{
-            backgroundColor: "#2a2a2a",
-            padding: "20px",
-            borderRadius: "5px",
-            marginBottom: "20px",
-            border: "1px solid #444",
-          }}>
-            <h3 style={{ color: "#66ff66", marginBottom: "10px", fontSize: "0.9em" }}>
-              Performance Analysis:
-            </h3>
-            <p style={{ color: "#fff", lineHeight: "1.6", fontSize: "0.8em" }}>
-              {conclusionData.gradeExplanation}
-            </p>
           </div>
           
           {/* Restart Button */}
