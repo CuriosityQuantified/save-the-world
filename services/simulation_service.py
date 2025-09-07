@@ -93,6 +93,14 @@ class SimulationService:
 
             # Add it to the state service
             self.state_service.create_simulation(simulation)
+            
+            # Start Langfuse session for this simulation
+            self.llm_service.start_langfuse_session(
+                simulation_id=simulation.simulation_id,
+                user_objective=initial_prompt or "Save the world simulation",
+                business_context="Business crisis simulation",
+                developer_mode=developer_mode
+            )
 
             # Generate the initial scenarios
             context = {
@@ -178,6 +186,16 @@ class SimulationService:
             if not simulation:
                 logger.error(f"Simulation not found: {simulation_id}")
                 return None
+            
+            # Ensure Langfuse session is active (reinitialize if needed)
+            if not self.llm_service.current_session_id:
+                logger.info(f"Reinitializing Langfuse session for simulation {simulation_id}")
+                self.llm_service.start_langfuse_session(
+                    simulation_id=simulation.simulation_id,
+                    user_objective="Continuing simulation",
+                    business_context="Business crisis simulation",
+                    developer_mode=simulation.developer_mode
+                )
 
             # Increment submission counter on each POST
             simulation.submission_count += 1
@@ -218,6 +236,11 @@ class SimulationService:
                 # Mark as complete since we've reached max submissions
                 simulation.is_complete = True
                 logger.info(f"[CONCLUSION] Simulation {simulation_id} marked as complete (is_complete=True)")
+                
+                # Flush Langfuse traces to ensure they're sent
+                if self.llm_service.langfuse:
+                    logger.info("[CONCLUSION] Flushing Langfuse traces")
+                    self.llm_service.langfuse.flush()
             else:
                 # Generate the NEXT REGULAR turn's scenarios
                 next_regular_turn = current_turn + 1
