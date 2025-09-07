@@ -47,6 +47,14 @@ if __name__ == "__main__":
         if port != default_port:
             print(f"Port {default_port} is in use. Using port {port} instead.")
         
+        # Write the port to a file for frontend discovery
+        try:
+            with open('.backend_port', 'w') as f:
+                f.write(str(port))
+            print(f"Backend port {port} written to .backend_port file")
+        except Exception as e:
+            print(f"Warning: Could not write port file: {e}")
+        
         # Log startup message
         print(f"Starting Interactive Simulation API on {host}:{port}")
         print("Press Ctrl+C to stop the server")

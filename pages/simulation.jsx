@@ -34,14 +34,40 @@ export default function SimulationPage({ initialScenario }) {
 
   // State for managing simulation initialization
   const [simulationStarted, setSimulationStarted] = useState(false);
+  
+  // State for backend port discovery
+  const [backendPort, setBackendPort] = useState(8000);
+  const [backendUrl, setBackendUrl] = useState('http://localhost:8000');
+  const [backendWsUrl, setBackendWsUrl] = useState('ws://localhost:8000');
+  
+  // Discover backend port on component mount
+  useEffect(() => {
+    async function discoverBackendPort() {
+      try {
+        const response = await fetch('/api/backend-port');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Backend discovered on port:', data.port);
+          setBackendPort(data.port);
+          setBackendUrl(data.url);
+          setBackendWsUrl(data.wsUrl);
+        }
+      } catch (error) {
+        console.error('Failed to discover backend port, using default:', error);
+      }
+    }
+    
+    discoverBackendPort();
+  }, []); // Run only once on mount
 
   // WebSocket setup and handling effect
   useEffect(() => {
     if (!simulationId) return;
 
-    // Connect directly to backend on port 8000, bypassing proxy
+    // Connect directly to backend using discovered port
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//localhost:8000/ws/simulations/${simulationId}`;
+    const wsUrl = `${protocol}//localhost:${backendPort}/ws/simulations/${simulationId}`;
+    console.log('Connecting WebSocket to:', wsUrl);
     wsRef.current = new WebSocket(wsUrl);
 
     wsRef.current.onopen = () => {
@@ -179,7 +205,7 @@ export default function SimulationPage({ initialScenario }) {
         wsRef.current.close();
       }
     };
-  }, [simulationId]); // Re-run effect if simulationId changes
+  }, [simulationId, backendPort]); // Re-run effect if simulationId or backendPort changes
 
   // Function to handle user response submission
   const handleSubmit = async (e) => {
@@ -230,7 +256,7 @@ export default function SimulationPage({ initialScenario }) {
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
       // Log the request details
-      const requestUrl = `http://localhost:8000/simulations/${simulationId}/respond`;
+      const requestUrl = `${backendUrl}/simulations/${simulationId}/respond`;
       const requestBody = { response_text: currentInput };
       console.log(`[DEBUG] Making POST request to: ${requestUrl}`);
       console.log(`[DEBUG] Request body:`, requestBody);
@@ -314,7 +340,7 @@ export default function SimulationPage({ initialScenario }) {
       const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
       
       // Call backend directly to avoid proxy timeout issues
-      const response = await fetch("http://localhost:8000/simulations", { 
+      const response = await fetch(`${backendUrl}/simulations`, { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Send an initial prompt or other required data if necessary
