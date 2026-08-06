@@ -47,7 +47,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Run save/resume regression suite
-        run: npx playwright test tests-e2e/save-resume.spec.js --reporter=line
+        run: npx playwright test tests-e2e/save-resume.spec.js --project=chromium --reporter=line
+        env:
+          CI: true
+      - name: Run mobile regression suite
+        run: npx playwright test tests-e2e/mobile.spec.js --project=mobile-chrome --reporter=line
         env:
           CI: true
       - name: Upload Playwright report

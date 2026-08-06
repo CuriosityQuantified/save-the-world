@@ -557,6 +557,7 @@ export default function SimulationPage({ initialScenario }) {
           width: "100%",
           maxHeight: "90vh",
           overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
           backgroundColor: "#1a1a1a",
           border: "3px solid #00ff00",
           borderRadius: "10px",
@@ -586,12 +587,8 @@ export default function SimulationPage({ initialScenario }) {
                 autoPlay
                 loop
                 muted
-                style={{
-                  width: "400px",
-                  height: "225px",
-                  borderRadius: "5px",
-                  border: "2px solid #444",
-                }}
+                playsInline
+                className="sim-conclusion-video"
               />
             </div>
           )}
@@ -702,6 +699,7 @@ export default function SimulationPage({ initialScenario }) {
 
       <Head>
         <title>Simulation Arcade</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
         <style>{`
           body, html {
@@ -712,6 +710,57 @@ export default function SimulationPage({ initialScenario }) {
           }
           * {
             box-sizing: border-box;
+          }
+          .sim-content-area {
+            position: relative;
+            width: 80%;
+            margin: 20px auto;
+          }
+          .sim-content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            height: 500px;
+            overflow: hidden;
+          }
+          .sim-media-section {
+            height: 100%;
+          }
+          .sim-chat-section {
+            height: 100%;
+          }
+          .sim-touch-btn {
+            touch-action: manipulation;
+          }
+          .sim-conclusion-video {
+            width: 400px;
+            height: 225px;
+            border-radius: 5px;
+            border: 2px solid #444;
+          }
+          @media (max-width: 768px) {
+            .sim-content-area {
+              width: 95% !important;
+              padding: 10px !important;
+              margin: 10px auto !important;
+            }
+            .sim-content-grid {
+              grid-template-columns: 1fr !important;
+              height: auto !important;
+              overflow: visible !important;
+            }
+            .sim-media-section {
+              height: 220px !important;
+              min-height: 180px;
+            }
+            .sim-chat-section {
+              height: 260px !important;
+            }
+            .sim-conclusion-video {
+              width: 100% !important;
+              height: auto !important;
+              max-width: 400px;
+            }
           }
         `}</style>
       </Head>
@@ -777,7 +826,7 @@ export default function SimulationPage({ initialScenario }) {
               </div>
             )}
             <button
-              className="begin-button"
+              className="begin-button sim-touch-btn"
             onClick={() => {
               clearSavedSimulation();
               setSimulationStarted(true);
@@ -799,6 +848,7 @@ export default function SimulationPage({ initialScenario }) {
               textTransform: "uppercase",
               opacity: isLoading ? 0.5 : 1,
               transition: "all 0.3s ease",
+              minHeight: "44px",
             }}
           >
             {isLoading ? "Loading..." : "Begin"}
@@ -806,6 +856,7 @@ export default function SimulationPage({ initialScenario }) {
             {savedSimulation && (
               <button
                 data-testid="continue-simulation"
+                className="sim-touch-btn"
                 onClick={resumeSimulation}
                 disabled={isLoading}
                 style={{
@@ -823,6 +874,7 @@ export default function SimulationPage({ initialScenario }) {
                   opacity: isLoading ? 0.5 : 1,
                   transition: "all 0.3s ease",
                   boxShadow: "0 0 8px rgba(0, 204, 255, 0.4)",
+                  minHeight: "44px",
                 }}
               >
                 Continue Simulation
@@ -834,10 +886,7 @@ export default function SimulationPage({ initialScenario }) {
 
       {/* Arcade Screen Content Area - Show after simulation starts */}
       {simulationStarted && (
-      <div style={{
-        position: "relative",
-        width: "80%",
-        margin: "20px auto",
+      <div className="sim-content-area" style={{
         backgroundColor: "rgba(0, 0, 0, 0.8)",
         border: "5px solid #333",
         borderRadius: "10px",
@@ -859,15 +908,9 @@ export default function SimulationPage({ initialScenario }) {
         </div>
 
         {/* Content Grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "15px",
-          height: "500px",  // Fixed height to prevent growing
-          overflow: "hidden",
-        }}>
+        <div className="sim-content-grid" style={{ gap: "15px" }}>
           {/* Media Section - Now uses MediaHandler */}
-          <div style={{
+          <div className="sim-media-section" style={{
             backgroundColor: "#111",
             border: "2px solid #444",
             borderRadius: "5px",
@@ -875,7 +918,6 @@ export default function SimulationPage({ initialScenario }) {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            height: "100%",
             minHeight: '200px',
             position: 'relative',
           }}>
@@ -907,8 +949,7 @@ export default function SimulationPage({ initialScenario }) {
           </div>
 
           {/* Chat Section - Single window matching video height */}
-          <div style={{
-            height: "100%",
+          <div className="sim-chat-section" style={{
             backgroundColor: "#1a1a1a",
             border: "2px solid #444",
             padding: "10px",
@@ -920,6 +961,7 @@ export default function SimulationPage({ initialScenario }) {
             justifyContent: isLoading && history.length === 0 ? "center" : "flex-start",
             alignItems: isLoading && history.length === 0 ? "center" : "stretch",
             fontFamily: '"Press Start 2P", cursive',
+            WebkitOverflowScrolling: "touch",
           }}>
             <div ref={chatEndRef} />
             {isLoading && history.length === 0 ? (
@@ -980,9 +1022,11 @@ export default function SimulationPage({ initialScenario }) {
               color: "#fff",
               fontFamily: 'inherit',
               fontSize: "0.8em",
+              minHeight: "44px",
+              touchAction: "manipulation",
             }}
           />
-          <button type="submit" disabled={isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId} style={{
+          <button type="submit" className="sim-touch-btn" disabled={isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId} style={{
             padding: "10px 15px",
             borderRadius: "5px",
             border: "none",
@@ -991,6 +1035,7 @@ export default function SimulationPage({ initialScenario }) {
             cursor: "pointer",
             fontFamily: 'inherit',
             fontSize: "0.8em",
+            minHeight: "44px",
             opacity: (isLoading || (submissionCount >= maxTurns && !showConclusion) || !simulationId) ? 0.5 : 1,
           }}>
             Send
