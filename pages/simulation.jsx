@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import MediaHandler from "../components/MediaHandler";
 
+const STORAGE_KEY = 'save-the-world:sim-state';
+
 export default function SimulationPage({ initialScenario }) {
   // Removed scenarioText state - using history instead
 
@@ -39,7 +41,11 @@ export default function SimulationPage({ initialScenario }) {
   const [backendPort, setBackendPort] = useState(8000);
   const [backendUrl, setBackendUrl] = useState('http://localhost:8000');
   const [backendWsUrl, setBackendWsUrl] = useState('ws://localhost:8000');
-  
+
+  // Save/resume state
+  const [savedSimulation, setSavedSimulation] = useState(null);
+  const [storageWarning, setStorageWarning] = useState(null);
+
   // Discover backend port on component mount
   useEffect(() => {
     async function discoverBackendPort() {
@@ -59,6 +65,54 @@ export default function SimulationPage({ initialScenario }) {
     
     discoverBackendPort();
   }, []); // Run only once on mount
+
+  // Load saved simulation from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.simulationId) {
+          setSavedSimulation(parsed);
+        }
+      }
+    } catch {
+      // Corrupted or inaccessible localStorage — ignore silently
+    }
+  }, []);
+
+  // Persist simulation state to localStorage while a simulation is in progress
+  useEffect(() => {
+    if (!simulationId || !simulationStarted || showConclusion) return;
+    try {
+      const snapshot = {
+        simulationId,
+        turn,
+        maxTurns,
+        submissionCount,
+        history,
+        currentVideoUrls,
+        currentAudioUrl,
+        scenarioGenerated,
+        videosGenerated,
+        audioGenerated,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch (err) {
+      if (err && err.name === 'QuotaExceededError') {
+        setStorageWarning('Storage full — progress will not be saved.');
+      }
+    }
+  }, [simulationId, simulationStarted, showConclusion, turn, maxTurns, submissionCount, history, currentVideoUrls, currentAudioUrl, scenarioGenerated, videosGenerated, audioGenerated]);
+
+  // Clear saved state when the simulation reaches the conclusion
+  useEffect(() => {
+    if (showConclusion) {
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      setSavedSimulation(null);
+    }
+  }, [showConclusion]);
 
   // WebSocket setup and handling effect
   useEffect(() => {
@@ -413,6 +467,27 @@ export default function SimulationPage({ initialScenario }) {
 
   // Removed automatic initialization - now triggered by button click
 
+  const clearSavedSimulation = () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    setSavedSimulation(null);
+  };
+
+  const resumeSimulation = () => {
+    if (!savedSimulation) return;
+    setSimulationId(savedSimulation.simulationId);
+    setTurn(savedSimulation.turn ?? 0);
+    setMaxTurns(savedSimulation.maxTurns ?? 3);
+    setSubmissionCount(savedSimulation.submissionCount ?? 0);
+    setHistory(savedSimulation.history ?? []);
+    setCurrentVideoUrls(savedSimulation.currentVideoUrls ?? []);
+    setCurrentAudioUrl(savedSimulation.currentAudioUrl ?? null);
+    setScenarioGenerated(savedSimulation.scenarioGenerated ?? false);
+    setVideosGenerated(savedSimulation.videosGenerated ?? false);
+    setAudioGenerated(savedSimulation.audioGenerated ?? false);
+    setSavedSimulation(null);
+    setSimulationStarted(true);
+  };
+
   // Animated checkmark component with fade-in effect
   const ProgressItem = ({ label, isComplete }) => (
     <div style={{
@@ -680,14 +755,31 @@ export default function SimulationPage({ initialScenario }) {
           `}</style>
           <div style={{
             position: "absolute",
-            top: "40.5%",  // Centered in the middle of the arcade screen
+            top: savedSimulation ? "38%" : "40.5%",
             left: "50%",
             transform: "translate(-50%, -50%)",
             zIndex: 100,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "14px",
           }}>
+            {storageWarning && (
+              <div style={{
+                color: "#ffcc00",
+                fontFamily: '"Press Start 2P", cursive',
+                fontSize: "0.5em",
+                textAlign: "center",
+                maxWidth: "280px",
+                marginBottom: "4px",
+              }}>
+                {storageWarning}
+              </div>
+            )}
             <button
               className="begin-button"
             onClick={() => {
+              clearSavedSimulation();
               setSimulationStarted(true);
               initializeSimulation();
             }}
@@ -711,6 +803,31 @@ export default function SimulationPage({ initialScenario }) {
           >
             {isLoading ? "Loading..." : "Begin"}
             </button>
+            {savedSimulation && (
+              <button
+                data-testid="continue-simulation"
+                onClick={resumeSimulation}
+                disabled={isLoading}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: "0.65em",
+                  fontFamily: '"Press Start 2P", cursive',
+                  backgroundColor: "#004488",
+                  color: "#00ccff",
+                  border: "2px solid #00ccff",
+                  borderRadius: "6px",
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  fontWeight: "bold",
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  opacity: isLoading ? 0.5 : 1,
+                  transition: "all 0.3s ease",
+                  boxShadow: "0 0 8px rgba(0, 204, 255, 0.4)",
+                }}
+              >
+                Continue Simulation
+              </button>
+            )}
           </div>
         </>
       )}

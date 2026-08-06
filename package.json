@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start -p 3000"
+    "start": "next start -p 3000",
+    "test:e2e": "playwright test",
+    "test:e2e:save-resume": "playwright test tests-e2e/save-resume.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
