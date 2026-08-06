@@ -94,13 +94,21 @@ class SimulationService:
             # Add it to the state service
             self.state_service.create_simulation(simulation)
             
-            # Start Langfuse session for this simulation
-            self.llm_service.start_langfuse_session(
-                simulation_id=simulation.simulation_id,
-                user_objective=initial_prompt or "Save the world simulation",
-                business_context="Business crisis simulation",
-                developer_mode=developer_mode
-            )
+            # Start Langfuse session for this simulation.
+            # Langfuse integration is not yet wired into LLMService (issue #10):
+            # guard so a missing implementation never breaks simulation creation.
+            if hasattr(self.llm_service, "start_langfuse_session"):
+                await self.llm_service.start_langfuse_session(
+                    simulation_id=simulation.simulation_id,
+                    user_objective=initial_prompt or "Save the world simulation",
+                    business_context="Business crisis simulation",
+                    developer_mode=developer_mode
+                )
+            else:
+                logger.warning(
+                    "LLMService.start_langfuse_session not implemented; skipping "
+                    "Langfuse session init (issue #10, Phase 2 not ready)"
+                )
 
             # Generate the initial scenarios
             context = {
@@ -187,15 +195,22 @@ class SimulationService:
                 logger.error(f"Simulation not found: {simulation_id}")
                 return None
             
-            # Ensure Langfuse session is active (reinitialize if needed)
-            if not self.llm_service.current_session_id:
+            # Ensure Langfuse session is active (reinitialize if needed).
+            # Guarded: LLMService may not have Langfuse wired up yet (issue #10).
+            if hasattr(self.llm_service, "current_session_id") and not self.llm_service.current_session_id:
                 logger.info(f"Reinitializing Langfuse session for simulation {simulation_id}")
-                self.llm_service.start_langfuse_session(
-                    simulation_id=simulation.simulation_id,
-                    user_objective="Continuing simulation",
-                    business_context="Business crisis simulation",
-                    developer_mode=simulation.developer_mode
-                )
+                if hasattr(self.llm_service, "start_langfuse_session"):
+                    await self.llm_service.start_langfuse_session(
+                        simulation_id=simulation.simulation_id,
+                        user_objective="Continuing simulation",
+                        business_context="Business crisis simulation",
+                        developer_mode=simulation.developer_mode
+                    )
+                else:
+                    logger.warning(
+                        "LLMService.start_langfuse_session not implemented; skipping "
+                        "Langfuse session reinit (issue #10)"
+                    )
 
             # Increment submission counter on each POST
             simulation.submission_count += 1
@@ -237,8 +252,8 @@ class SimulationService:
                 simulation.is_complete = True
                 logger.info(f"[CONCLUSION] Simulation {simulation_id} marked as complete (is_complete=True)")
                 
-                # Flush Langfuse traces to ensure they're sent
-                if self.llm_service.langfuse:
+                # Flush Langfuse traces to ensure they're sent (guarded, issue #10)
+                if hasattr(self.llm_service, "langfuse") and self.llm_service.langfuse:
                     logger.info("[CONCLUSION] Flushing Langfuse traces")
                     self.llm_service.langfuse.flush()
             else:
