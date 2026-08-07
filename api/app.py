@@ -39,10 +39,13 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# Origins are read from CORS_ORIGINS (comma-separated) so staging/prod can
+# lock to specific domains without a code change.
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development - restrict in production
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
