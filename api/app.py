@@ -18,6 +18,7 @@ from services.state_service import StateService
 from services.media_service import MediaService
 from services.simulation_service import SimulationService
 from services.analytics_service import AnalyticsService
+from services.leaderboard_service import LeaderboardService
 from api.routes import router
 
 # Load environment variables
@@ -152,6 +153,10 @@ def init_services():
 
         # Attach analytics service to router (derives metrics from state_service)
         router.analytics_service = AnalyticsService(state_service)
+
+        # Attach leaderboard service (SQLite-backed persistence)
+        leaderboard_db = os.path.join(PROJECT_ROOT, "leaderboard.db")
+        router.leaderboard_service = LeaderboardService(db_path=leaderboard_db)
 
         logger.info("Services initialized successfully")
     except Exception as e:

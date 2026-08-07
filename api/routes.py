@@ -11,9 +11,11 @@ import io
 import logging
 import json
 from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest
+from models.leaderboard import LeaderboardEntry, LeaderboardSubmitRequest, TimePeriod, extract_grade
 
 from services.simulation_service import SimulationService
 from services.analytics_service import AnalyticsService
+from services.leaderboard_service import LeaderboardService
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +260,71 @@ async def export_analytics_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=analytics.csv"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Leaderboard routes (issue #4)
+# ---------------------------------------------------------------------------
+
+async def get_leaderboard_service() -> LeaderboardService:
+    return router.leaderboard_service
+
+
+@router.post("/leaderboard", response_model=LeaderboardEntry, status_code=201)
+async def submit_leaderboard_score(
+    body: LeaderboardSubmitRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+    leaderboard_service: LeaderboardService = Depends(get_leaderboard_service),
+):
+    """Submit a completed simulation's grade to the leaderboard.
+
+    The score is always read from the server-side simulation state — the client
+    cannot supply or override it.  Returns 400 if the simulation is not complete
+    or has no grade.  Returns 409 if this simulation was already submitted.
+    """
+    simulation_id = body.simulation_id.strip()
+    sim = simulation_service.state_service.get_simulation(simulation_id)
+    if sim is None:
+        raise HTTPException(status_code=404, detail=f"Simulation '{simulation_id}' not found")
+    if not sim.is_complete:
+        raise HTTPException(status_code=400, detail="Simulation is not complete yet")
+    grade = extract_grade(sim)
+    if grade is None:
+        raise HTTPException(status_code=400, detail="Simulation has no grade — cannot submit to leaderboard")
+    if not 0 <= grade <= 100:
+        raise HTTPException(status_code=400, detail="Simulation grade must be between 0 and 100")
+    player_name = body.player_name.strip() if body.player_name and body.player_name.strip() else None
+    try:
+        return leaderboard_service.submit_score(
+            simulation_id=simulation_id,
+            player_name=player_name,
+            score=grade,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.get("/leaderboard", response_model=List[LeaderboardEntry])
+async def get_leaderboard(
+    period: TimePeriod = TimePeriod.ALL_TIME,
+    limit: int = 10,
+    leaderboard_service: LeaderboardService = Depends(get_leaderboard_service),
+):
+    if limit not in (10, 25, 100):
+        raise HTTPException(status_code=400, detail="limit must be 10, 25, or 100")
+    return leaderboard_service.get_leaderboard(period=period, limit=limit)
+
+
+@router.get("/leaderboard/rank/{simulation_id}")
+async def get_player_rank(
+    simulation_id: str,
+    period: TimePeriod = TimePeriod.ALL_TIME,
+    leaderboard_service: LeaderboardService = Depends(get_leaderboard_service),
+):
+    rank_info = leaderboard_service.get_rank(simulation_id, period=period)
+    if rank_info is None:
+        raise HTTPException(status_code=404, detail=f"No leaderboard entry for simulation '{simulation_id}'")
+    return rank_info
 
 
 @router.websocket("/ws/simulations/{simulation_id}")
