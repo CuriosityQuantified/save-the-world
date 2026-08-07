@@ -4,7 +4,7 @@ API Routes Module
 This module defines the FastAPI routes for the simulation API.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Dict, Any, List, Optional
 import io
@@ -310,13 +310,15 @@ async def websocket_endpoint(
                 del active_connections[simulation_id]
 
 @router.get("/debug/media-check")
-async def debug_media_check():
+async def debug_media_check(request: Request):
     """
     Debug endpoint to check media directories and files.
     Verifies that media directories exist and lists files in them,
     based on the configuration in api/app.py.
     """
     import os
+    from starlette.routing import Mount
+    from fastapi.staticfiles import StaticFiles
     from api.app import PROJECT_ROOT  # Import PROJECT_ROOT from app.py
     
     # Define base media directory using PROJECT_ROOT
@@ -358,8 +360,8 @@ async def debug_media_check():
     except Exception as e:
         logger.error(f"Error accessing audio directory {audio_dir}: {e}")
 
-    # Check configured media mounts (this part can remain as is)
-    app = router.app 
+    # Check configured media mounts via the running FastAPI app instance.
+    app = request.app
     mounts = []
     static_mounts = {}
     for route in app.routes:
