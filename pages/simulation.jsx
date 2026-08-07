@@ -28,6 +28,11 @@ export default function SimulationPage({ initialScenario }) {
   const [showConclusion, setShowConclusion] = useState(false);
   const [conclusionData, setConclusionData] = useState(null);
 
+  // Leaderboard submit state (inside ConclusionOverlay)
+  const [lbPlayerName, setLbPlayerName] = useState("");
+  const [lbSubmitState, setLbSubmitState] = useState("idle"); // idle | loading | success | skipped | error
+  const [lbRank, setLbRank] = useState(null);
+
   const [history, setHistory] = useState([]);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -649,6 +654,146 @@ export default function SimulationPage({ initialScenario }) {
             </div>
           </div>
           
+          {/* Leaderboard Submit Section */}
+          {lbSubmitState === "idle" && (
+            <div
+              data-testid="lb-submit-section"
+              style={{
+                backgroundColor: "#1a1a2e",
+                border: "1px solid #00cc44",
+                borderRadius: "8px",
+                padding: "20px",
+                marginBottom: "20px",
+                textAlign: "center",
+              }}
+            >
+              <p style={{ color: "#00cc44", fontSize: "0.7em", marginBottom: "14px" }}>
+                Submit your score to the leaderboard?
+              </p>
+              <input
+                data-testid="lb-name-input"
+                type="text"
+                maxLength={64}
+                value={lbPlayerName}
+                onChange={(e) => setLbPlayerName(e.target.value)}
+                placeholder="Your name (leave blank for anonymous)"
+                style={{
+                  width: "100%",
+                  background: "#0a0a1a",
+                  border: "1px solid #444",
+                  borderRadius: "5px",
+                  padding: "10px 12px",
+                  color: "#e5e7eb",
+                  fontSize: "0.65em",
+                  fontFamily: "system-ui, sans-serif",
+                  marginBottom: "12px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <button
+                  data-testid="lb-submit-btn"
+                  onClick={async () => {
+                    setLbSubmitState("loading");
+                    try {
+                      const res = await fetch(`${backendUrl}/api/leaderboard`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          simulation_id: simulationId,
+                          player_name: lbPlayerName.trim() || null,
+                        }),
+                      });
+                      if (res.status === 201) {
+                        const data = await res.json();
+                        setLbRank(data.rank);
+                        setLbSubmitState("success");
+                      } else {
+                        const err = await res.json().catch(() => ({}));
+                        console.error("Leaderboard submit failed:", err.detail || res.status);
+                        setLbSubmitState("error");
+                      }
+                    } catch (e) {
+                      console.error("Leaderboard submit error:", e);
+                      setLbSubmitState("error");
+                    }
+                  }}
+                  style={{
+                    background: "#00cc44",
+                    color: "#000",
+                    border: "none",
+                    borderRadius: "5px",
+                    padding: "10px 22px",
+                    fontSize: "0.65em",
+                    fontFamily: '"Press Start 2P", cursive',
+                    cursor: "pointer",
+                  }}
+                >
+                  SUBMIT
+                </button>
+                <button
+                  data-testid="lb-skip-btn"
+                  onClick={() => setLbSubmitState("skipped")}
+                  style={{
+                    background: "transparent",
+                    color: "#6b7280",
+                    border: "1px solid #444",
+                    borderRadius: "5px",
+                    padding: "10px 22px",
+                    fontSize: "0.65em",
+                    fontFamily: '"Press Start 2P", cursive',
+                    cursor: "pointer",
+                  }}
+                >
+                  SKIP
+                </button>
+              </div>
+            </div>
+          )}
+
+          {lbSubmitState === "success" && (
+            <div
+              data-testid="lb-success-msg"
+              style={{
+                backgroundColor: "#0a2a0a",
+                border: "1px solid #00cc44",
+                borderRadius: "8px",
+                padding: "16px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#00cc44",
+                fontSize: "0.7em",
+              }}
+            >
+              Score submitted! You ranked #{lbRank}. &nbsp;
+              <a href="/leaderboard" style={{ color: "#a78bfa", textDecoration: "underline" }}>View Leaderboard</a>
+            </div>
+          )}
+
+          {lbSubmitState === "error" && (
+            <div
+              data-testid="lb-error-msg"
+              style={{
+                backgroundColor: "#2a0a0a",
+                border: "1px solid #ff4444",
+                borderRadius: "8px",
+                padding: "16px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#ff4444",
+                fontSize: "0.7em",
+              }}
+            >
+              Could not submit score. &nbsp;
+              <button
+                onClick={() => setLbSubmitState("idle")}
+                style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: "inherit", textDecoration: "underline" }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
           {/* Restart Button */}
           <div style={{ textAlign: "center" }}>
             <button
@@ -899,6 +1044,26 @@ export default function SimulationPage({ initialScenario }) {
               }}
             >
               Analytics Dashboard
+            </a>
+            <a
+              href="/leaderboard"
+              data-testid="leaderboard-link"
+              style={{
+                padding: "8px 16px",
+                fontSize: "0.55em",
+                fontFamily: '"Press Start 2P", cursive',
+                color: "#9ca3af",
+                border: "1px solid #555",
+                borderRadius: "6px",
+                textDecoration: "none",
+                textTransform: "uppercase",
+                minHeight: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              Leaderboard
             </a>
           </div>
         </>
