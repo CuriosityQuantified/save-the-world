@@ -17,6 +17,7 @@ from services.llm_service import LLMService
 from services.state_service import StateService
 from services.media_service import MediaService
 from services.simulation_service import SimulationService
+from services.analytics_service import AnalyticsService
 from api.routes import router
 
 # Load environment variables
@@ -148,7 +149,10 @@ def init_services():
         
         # Attach simulation service to router
         router.simulation_service = simulation_service
-        
+
+        # Attach analytics service to router (derives metrics from state_service)
+        router.analytics_service = AnalyticsService(state_service)
+
         logger.info("Services initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing services: {str(e)}")

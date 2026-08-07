@@ -880,6 +880,26 @@ export default function SimulationPage({ initialScenario }) {
                 Continue Simulation
               </button>
             )}
+            <a
+              href="/analytics"
+              data-testid="analytics-link"
+              style={{
+                padding: "8px 16px",
+                fontSize: "0.55em",
+                fontFamily: '"Press Start 2P", cursive',
+                color: "#9ca3af",
+                border: "1px solid #555",
+                borderRadius: "6px",
+                textDecoration: "none",
+                textTransform: "uppercase",
+                minHeight: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              Analytics Dashboard
+            </a>
           </div>
         </>
       )}
