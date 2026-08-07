@@ -21,6 +21,11 @@ from utils.media import ensure_media_directories, save_media_file
 
 logger = logging.getLogger(__name__)
 
+# When VERIFY_SSL=false is set in the environment (e.g. a staging server with a
+# self-signed cert), certificate verification is disabled.  The default is true
+# so production traffic always verifies certificates.
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() == "true"
+
 
 class MediaService:
     """
@@ -144,12 +149,13 @@ class MediaService:
                 try:
                     logger.info(
                         f"Fetching video content from URL: {video_result}")
-                    # Create SSL context that doesn't verify certificates (for development only)
-                    ssl_context = ssl.create_default_context()
-                    ssl_context.check_hostname = False
-                    ssl_context.verify_mode = ssl.CERT_NONE
-                    
-                    connector = aiohttp.TCPConnector(ssl=ssl_context)
+                    if VERIFY_SSL:
+                        connector = aiohttp.TCPConnector()
+                    else:
+                        ssl_context = ssl.create_default_context()
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                        connector = aiohttp.TCPConnector(ssl=ssl_context)
                     async with aiohttp.ClientSession(connector=connector) as session:
                         async with session.get(video_result) as response:
                             if response.status == 200:
