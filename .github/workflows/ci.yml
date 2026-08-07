@@ -58,6 +58,10 @@ jobs:
         run: npx playwright test tests-e2e/mobile.spec.js --project=mobile-chrome --reporter=line
         env:
           CI: true
+      - name: Run analytics dashboard regression suite
+        run: npx playwright test tests-e2e/analytics.spec.js --project=chromium --reporter=line
+        env:
+          CI: true
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

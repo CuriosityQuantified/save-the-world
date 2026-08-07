@@ -5,13 +5,15 @@ This module defines the FastAPI routes for the simulation API.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Dict, Any, List, Optional
+import io
 import logging
 import json
 from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest
 
 from services.simulation_service import SimulationService
+from services.analytics_service import AnalyticsService
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +229,36 @@ async def delete_simulation(
     if not result:
         raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
     return None
+
+async def get_analytics_service() -> AnalyticsService:
+    return router.analytics_service
+
+
+@router.get("/analytics/summary")
+async def get_analytics_summary(
+    analytics_service: AnalyticsService = Depends(get_analytics_service),
+):
+    return analytics_service.get_summary()
+
+
+@router.get("/analytics/trends")
+async def get_analytics_trends(
+    analytics_service: AnalyticsService = Depends(get_analytics_service),
+):
+    return analytics_service.get_trends()
+
+
+@router.get("/analytics/export")
+async def export_analytics_csv(
+    analytics_service: AnalyticsService = Depends(get_analytics_service),
+):
+    csv_data = analytics_service.export_csv()
+    return StreamingResponse(
+        io.StringIO(csv_data),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=analytics.csv"},
+    )
+
 
 @router.websocket("/ws/simulations/{simulation_id}")
 async def websocket_endpoint(
