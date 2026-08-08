@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 import io
 import logging
 import json
-from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest
+from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest, DifficultyChangeRequest
 from models.leaderboard import LeaderboardEntry, LeaderboardSubmitRequest, TimePeriod, extract_grade
 
 from services.simulation_service import SimulationService
@@ -49,8 +49,9 @@ async def create_simulation(
     """
     try:
         simulation = await simulation_service.create_new_simulation(
-            request.initial_prompt, 
-            developer_mode=request.developer_mode
+            request.initial_prompt,
+            developer_mode=request.developer_mode,
+            difficulty=request.difficulty.value
         )
         return simulation
     except Exception as e:
@@ -203,6 +204,34 @@ async def toggle_developer_mode(
     except Exception as e:
         logger.error(f"Error toggling developer mode: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to toggle developer mode: {str(e)}")
+
+@router.put("/simulations/{simulation_id}/difficulty", response_model=SimulationState)
+async def change_difficulty(
+    simulation_id: str,
+    request: DifficultyChangeRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service)
+):
+    """
+    Change the difficulty level for a simulation mid-game.
+
+    Args:
+        simulation_id: The ID of the simulation
+        request: The new difficulty level
+
+    Returns:
+        The updated SimulationState
+    """
+    try:
+        simulation = await simulation_service.change_difficulty(simulation_id, request.difficulty.value)
+        if not simulation:
+            raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
+        return simulation
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error changing difficulty: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to change difficulty: {str(e)}")
+
 
 @router.get("/simulations", response_model=List[SimulationState])
 async def list_simulations(

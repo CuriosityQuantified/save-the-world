@@ -4,6 +4,12 @@ import MediaHandler from "../components/MediaHandler";
 
 const STORAGE_KEY = 'save-the-world:sim-state';
 
+const DIFFICULTY_STYLES = {
+  easy:   { color: "#00ff00", bg: "rgba(0,255,0,0.08)",     activeBg: "#004400", label: "EASY",   badge: "ROOKIE MODE"    },
+  normal: { color: "#00ccff", bg: "rgba(0,204,255,0.08)",   activeBg: "#003344", label: "NORMAL", badge: "STANDARD MISSION" },
+  hard:   { color: "#ff4444", bg: "rgba(255,68,68,0.08)",   activeBg: "#440000", label: "HARD",   badge: "CRISIS EXPERT"  },
+};
+
 export default function SimulationPage({ initialScenario }) {
   // Removed scenarioText state - using history instead
 
@@ -41,6 +47,7 @@ export default function SimulationPage({ initialScenario }) {
 
   // State for managing simulation initialization
   const [simulationStarted, setSimulationStarted] = useState(false);
+  const [difficulty, setDifficulty] = useState("normal"); // "easy" | "normal" | "hard"
   
   // State for backend port discovery
   const [backendPort, setBackendPort] = useState(8000);
@@ -404,9 +411,10 @@ export default function SimulationPage({ initialScenario }) {
         headers: { "Content-Type": "application/json" },
         // Send an initial prompt or other required data if necessary
         // Assuming SimulationRequest might just need developer_mode or an empty prompt for now
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             initial_prompt: "Start a new simulation.", // Example initial prompt
-            developer_mode: false // Assuming default behavior
+            developer_mode: false, // Assuming default behavior
+            difficulty: difficulty
         }),
         signal: controller.signal // Add abort signal for timeout
       });
@@ -639,6 +647,30 @@ export default function SimulationPage({ initialScenario }) {
             </p>
           </div>
           
+          {/* Difficulty Achievement Badge */}
+          <div
+            data-testid="difficulty-achievement"
+            style={{
+              textAlign: "center",
+              marginBottom: "12px",
+            }}
+          >
+            <span style={{
+              display: "inline-block",
+              fontFamily: '"Press Start 2P", cursive',
+              fontSize: "0.5em",
+              padding: "4px 12px",
+              borderRadius: "4px",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              border: `2px solid ${DIFFICULTY_STYLES[difficulty].color}`,
+              color: DIFFICULTY_STYLES[difficulty].color,
+              backgroundColor: DIFFICULTY_STYLES[difficulty].bg,
+            }}>
+              {DIFFICULTY_STYLES[difficulty].badge}
+            </span>
+          </div>
+
           {/* Grade Display - Now after Performance Analysis */}
           <div style={{
             textAlign: "center",
@@ -970,6 +1002,51 @@ export default function SimulationPage({ initialScenario }) {
                 {storageWarning}
               </div>
             )}
+            {/* Difficulty Selector */}
+            <div
+              data-testid="difficulty-selector"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "4px",
+              }}
+            >
+              <div style={{
+                fontFamily: '"Press Start 2P", cursive',
+                fontSize: "0.45em",
+                color: "#9ca3af",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+              }}>
+                Difficulty
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {["easy", "normal", "hard"].map((level) => (
+                  <button
+                    key={level}
+                    data-testid={`difficulty-${level}`}
+                    onClick={() => setDifficulty(level)}
+                    style={{
+                      padding: "6px 10px",
+                      fontFamily: '"Press Start 2P", cursive',
+                      fontSize: "0.4em",
+                      textTransform: "uppercase",
+                      border: difficulty === level ? `2px solid ${DIFFICULTY_STYLES[level].color}` : "2px solid #555",
+                      borderRadius: "4px",
+                      backgroundColor: difficulty === level ? DIFFICULTY_STYLES[level].activeBg : "#111",
+                      color: difficulty === level ? DIFFICULTY_STYLES[level].color : "#666",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               className="begin-button sim-touch-btn"
             onClick={() => {
@@ -1083,13 +1160,69 @@ export default function SimulationPage({ initialScenario }) {
         {/* Turn Counter */}
         <div style={{
           textAlign: "center",
-          marginBottom: "10px",
+          marginBottom: "4px",
           color: "#00ff00",
           textShadow: "0 0 5px #00ff00",
           fontSize: "0.8em",
           fontFamily: '"Press Start 2P", cursive',
         }}>
           TURN {Math.min(turn > 0 ? turn : 1, maxTurns)}/{maxTurns}
+        </div>
+
+        {/* Difficulty Indicator + Mid-Game Change */}
+        <div
+          data-testid="difficulty-indicator"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            marginBottom: "10px",
+          }}
+        >
+          <span style={{
+            fontFamily: '"Press Start 2P", cursive',
+            fontSize: "0.45em",
+            color: DIFFICULTY_STYLES[difficulty].color,
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+          }}>
+            {DIFFICULTY_STYLES[difficulty].label}
+          </span>
+          {!showConclusion && (
+            <button
+              data-testid="difficulty-change-btn"
+              onClick={async () => {
+                const levels = ["easy", "normal", "hard"];
+                const next = levels[(levels.indexOf(difficulty) + 1) % levels.length];
+                setDifficulty(next);
+                if (simulationId) {
+                  try {
+                    await fetch(`${backendUrl}/simulations/${simulationId}/difficulty`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ difficulty: next }),
+                    });
+                  } catch (e) {
+                    console.error("Failed to update difficulty on server:", e);
+                  }
+                }
+              }}
+              style={{
+                fontFamily: '"Press Start 2P", cursive',
+                fontSize: "0.35em",
+                padding: "2px 6px",
+                backgroundColor: "#111",
+                color: "#666",
+                border: "1px solid #444",
+                borderRadius: "3px",
+                cursor: "pointer",
+                textTransform: "uppercase",
+              }}
+            >
+              Change
+            </button>
+          )}
         </div>
 
         {/* Content Grid */}

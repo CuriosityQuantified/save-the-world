@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
+from enum import Enum
 import json
 import re
 import uuid
@@ -71,6 +72,12 @@ class SimulationTurn(BaseModel):
     llm_logs: List[LLMLog] = []  # New field to store LLM logs for this turn
     timestamp: datetime = Field(default_factory=datetime.now)
 
+class DifficultyLevel(str, Enum):
+    EASY = "easy"
+    NORMAL = "normal"
+    HARD = "hard"
+
+
 class SimulationState(BaseModel):
     """Model representing the complete state of a simulation."""
     simulation_id: str = Field(default_factory=lambda: f"sim_{uuid.uuid4().hex[:12]}")
@@ -82,6 +89,7 @@ class SimulationState(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     developer_mode: bool = False  # Flag to enable/disable developer mode
+    difficulty: DifficultyLevel = DifficultyLevel.NORMAL  # Difficulty level for this simulation
 
     def dict(self, *args, **kwargs):
         """
@@ -246,6 +254,7 @@ class SimulationRequest(BaseModel):
     """Model for requesting a new simulation."""
     initial_prompt: Optional[str] = Field(None, max_length=500)
     developer_mode: bool = False  # Flag to enable developer mode
+    difficulty: DifficultyLevel = DifficultyLevel.NORMAL  # Difficulty level for this simulation
 
     @field_validator("initial_prompt", mode="before")
     @classmethod
@@ -264,3 +273,8 @@ class UserResponseRequest(BaseModel):
 class DeveloperModeRequest(BaseModel):
     """Model for toggling developer mode."""
     enabled: bool
+
+
+class DifficultyChangeRequest(BaseModel):
+    """Model for changing difficulty level mid-game."""
+    difficulty: DifficultyLevel
