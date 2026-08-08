@@ -21,6 +21,8 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Run LLM log routing regression
+        run: pytest tests/unit/test_llm_log_routing_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them):

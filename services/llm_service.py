@@ -146,13 +146,17 @@ class LLMService:
 
         return self.llm_instances[model_name]
 
-    def set_log_callback(self, callback: Callable[[int, LLMLog],
-                                                  Awaitable[None]]):
+    def set_log_callback(self, callback: Callable[..., Awaitable[None]]):
         """
         Set a callback function for logging LLM interactions.
 
+        The callback receives ``turn_number`` and ``LLMLog`` positionally. When
+        a simulation ID is available, it is supplied as the ``simulation_id``
+        keyword argument so concurrent simulations remain isolated.
+
         Args:
-            callback: An async function that takes a turn number and an LLMLog object
+            callback: An async function that accepts a turn number, an LLMLog,
+                and an optional simulation_id keyword argument.
         """
         self.log_callback = callback
 
@@ -163,7 +167,8 @@ class LLMService:
                               completion: str,
                               parameters: Dict[str, Any] = {},
                               model_name: str = None,
-                              response_time: float = None):
+                              response_time: float = None,
+                              simulation_id: Optional[str] = None):
         """
         Log an LLM interaction if a callback is set.
 
@@ -175,6 +180,7 @@ class LLMService:
             parameters: Additional parameters used in the request
             model_name: The model name used for this operation
             response_time: The response time in seconds
+            simulation_id: The simulation that initiated this interaction
         """
         if self.log_callback:
             log = LLMLog(operation_name=operation_name,
@@ -183,7 +189,14 @@ class LLMService:
                          model_name=model_name or self.default_model_name,
                          parameters=parameters,
                          response_time_seconds=response_time)
-            await self.log_callback(turn_number, log)
+            if simulation_id is None:
+                await self.log_callback(turn_number, log)
+            else:
+                await self.log_callback(
+                    turn_number,
+                    log,
+                    simulation_id=simulation_id,
+                )
             logger.info(
                 f"Logged LLM interaction: {operation_name}{' (Response time: {:.2f}s)'.format(response_time) if response_time else ''}"
             )
@@ -199,6 +212,7 @@ class LLMService:
                 - previous_turn_number: The previous turn number
                 - user_prompt_for_this_turn: Any specific user directions for this turn
                 - max_turns: Maximum number of turns in the simulation (default is 6)
+                - simulation_id: ID of the simulation for log routing
 
         Returns:
             A scenario dictionary with 'id', 'situation_description', 'user_role', 'user_prompt', and 'rationale'
@@ -211,6 +225,7 @@ class LLMService:
                                                 "")
         max_turns = context.get("max_turns", 3)
         difficulty = context.get("difficulty", "normal")
+        simulation_id = context.get("simulation_id")
 
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
@@ -345,7 +360,7 @@ class LLMService:
                     num_ideas,
                     "is_final_turn":
                     is_conclusion_generation
-                }, model_used, response_time)
+                }, model_used, response_time, simulation_id=simulation_id)
 
             # Store the scenario in the dictionary
             scenario_id = scenario.get("id")
@@ -377,7 +392,7 @@ class LLMService:
                 num_ideas,
                 "is_final_turn":
                 is_conclusion_generation
-            }, model_used, response_time)
+            }, model_used, response_time, simulation_id=simulation_id)
 
         # Parse the JSON result into a list of scenario dictionaries
         scenarios = self._parse_json_scenarios(result, current_turn_number)
@@ -403,7 +418,8 @@ class LLMService:
 
     async def create_video_prompt(self,
                                   scenario: Dict[str, str],
-                                  turn_number: int = 1) -> List[str]:
+                                  turn_number: int = 1,
+                                  simulation_id: Optional[str] = None) -> List[str]:
         """
         Generate a video generation prompt from the scenario details,
         parse it, and return a list of scene descriptions.
@@ -411,6 +427,7 @@ class LLMService:
         Args:
             scenario: The scenario dictionary with 'situation_description'
             turn_number: The current turn number for logging
+            simulation_id: The simulation that initiated this interaction
 
         Returns:
             A list of four scene descriptions. Returns an empty list if parsing fails.
@@ -447,7 +464,8 @@ class LLMService:
             # Log the interaction
             await self.log_interaction(turn_number, "create_video_prompt_llm_call",
                                        formatted_prompt, raw_llm_output, {},
-                                       model_used, response_time)
+                                       model_used, response_time,
+                                       simulation_id=simulation_id)
 
             # Attempt to parse JSON, trying to extract from markdown if necessary
             parsed_json = None
@@ -477,7 +495,8 @@ class LLMService:
                         f"Invalid JSON structure. Raw: {raw_llm_output[:500]}. Extracted/Processed: {json_str[:500]}. Parsed: {str(parsed_json)[:200]}",
                         {},
                         model_used,
-                        response_time
+                        response_time,
+                        simulation_id=simulation_id,
                     )
                     return [] # Return empty list on structure error
 
@@ -492,7 +511,8 @@ class LLMService:
                     f"JSONDecodeError: {str(e)} - Raw: {raw_llm_output[:1000]} - Processed: {json_str[:3500]}",
                     {},
                     model_used,
-                    response_time
+                    response_time,
+                    simulation_id=simulation_id,
                 )
                 return [] # Return empty list on JSON decode error
 
@@ -508,7 +528,8 @@ class LLMService:
                 f"LLM Error: {str(e)}",
                 {},
                 model_used,
-                response_time # Can still log time if failure happened after start
+                response_time, # Can still log time if failure happened after start
+                simulation_id=simulation_id,
             )
             return [] # Return empty list on LLM call failure
 

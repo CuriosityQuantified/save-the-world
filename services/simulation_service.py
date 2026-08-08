@@ -49,29 +49,36 @@ class SimulationService:
         # Set up the logging callback for the LLM service
         self.llm_service.set_log_callback(self._log_llm_interaction)
 
-    async def _log_llm_interaction(self, turn_number: int, llm_log: LLMLog) -> None:
+    async def _log_llm_interaction(
+        self,
+        turn_number: int,
+        llm_log: LLMLog,
+        simulation_id: Optional[str] = None,
+    ) -> None:
         """
-        Callback for logging LLM interactions.
+        Store an LLM interaction on its owning simulation.
 
         Args:
             turn_number: The turn number the log belongs to
             llm_log: The LLM log to store
+            simulation_id: ID of the simulation that initiated the LLM call
         """
-        # Find the simulation that's currently being processed
-        # This is a simplification - in a real system, we'd need to track which simulation
-        # is associated with each LLM call
-        simulations = self.state_service.get_all_simulations()
-        if not simulations:
-            logger.warning("No simulations found for LLM log")
+        if not simulation_id:
+            logger.warning("Missing simulation ID for LLM log")
             return
 
-        # For now, we'll log to the most recently created simulation
-        simulations.sort(key=lambda s: s.created_at, reverse=True)
-        simulation = simulations[0]
+        simulation = self.state_service.get_simulation(simulation_id)
+        if not simulation:
+            logger.warning("Simulation %s not found for LLM log", simulation_id)
+            return
 
         # Only log if developer mode is enabled
         if simulation.developer_mode:
-            logger.info(f"Logging LLM interaction for simulation {simulation.simulation_id}, turn {turn_number}")
+            logger.info(
+                "Logging LLM interaction for simulation %s, turn %s",
+                simulation.simulation_id,
+                turn_number,
+            )
             simulation.add_llm_log(turn_number, llm_log)
             self.state_service.update_simulation(simulation)
 
@@ -118,7 +125,8 @@ class SimulationService:
                 "previous_turn_number": 0,
                 "user_prompt_for_this_turn": initial_prompt or "",
                 "max_turns": simulation.max_turns,
-                "difficulty": simulation.difficulty.value
+                "difficulty": simulation.difficulty.value,
+                "simulation_id": simulation.simulation_id
             }
 
             # Generate a single scenario
@@ -155,7 +163,11 @@ class SimulationService:
                 simulation.select_scenario(1, scenario_id)
 
                 # Generate media prompts - video prompt only
-                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=1)
+                video_prompt = await self.llm_service.create_video_prompt(
+                    scenario,
+                    turn_number=1,
+                    simulation_id=simulation.simulation_id,
+                )
 
                 # Add media prompts to the simulation state - set narration_script to None
                 simulation.add_media_prompts(1, video_prompt, None)
@@ -246,7 +258,8 @@ class SimulationService:
                     "previous_turn_number": current_turn - 1,
                     "user_prompt_for_this_turn": user_response,  # Pass the user's final response
                     "max_turns": simulation.max_turns,
-                    "difficulty": simulation.difficulty.value
+                    "difficulty": simulation.difficulty.value,
+                    "simulation_id": simulation.simulation_id
                 }
 
                 logger.info(f"[CONCLUSION] Context prepared: turn={context['current_turn_number']}, has_user_prompt={bool(context['user_prompt_for_this_turn'])}")
@@ -274,7 +287,8 @@ class SimulationService:
                         "previous_turn_number": current_turn - 1,
                         "user_prompt_for_this_turn": user_response,
                         "max_turns": simulation.max_turns,
-                        "difficulty": simulation.difficulty.value
+                        "difficulty": simulation.difficulty.value,
+                        "simulation_id": simulation.simulation_id
                     }
                     logger.info(f"[CONCLUSION] Forced conclusion generation due to turn overflow")
                 else:
@@ -287,7 +301,8 @@ class SimulationService:
                         "previous_turn_number": current_turn,
                         "user_prompt_for_this_turn": "", # Default for regular next turn
                         "max_turns": simulation.max_turns,
-                        "difficulty": simulation.difficulty.value
+                        "difficulty": simulation.difficulty.value,
+                        "simulation_id": simulation.simulation_id
                     }
                     # is_complete remains False
 
@@ -356,7 +371,11 @@ class SimulationService:
                 simulation.select_scenario(storage_turn, scenario_id)
 
                 # Generate media prompts - video prompt only
-                video_prompt = await self.llm_service.create_video_prompt(scenario, turn_number=storage_turn)
+                video_prompt = await self.llm_service.create_video_prompt(
+                    scenario,
+                    turn_number=storage_turn,
+                    simulation_id=simulation.simulation_id,
+                )
 
                 # Add media prompts to the simulation state - set narration_script to None
                 simulation.add_media_prompts(storage_turn, video_prompt, None)
