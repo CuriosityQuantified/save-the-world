@@ -143,9 +143,9 @@ async def test_keyboard_interrupt_not_swallowed():
     _stub_create_idea(svc)
 
     # With the fix: `except Exception:` does NOT catch KeyboardInterrupt, so
-    # it propagates. The test must see SOME exception (either the
-    # KeyboardInterrupt or the original RuntimeError).
-    with pytest.raises((KeyboardInterrupt, RuntimeError)):
+    # the recovery signal itself must escape rather than being replaced by the
+    # original RuntimeError.
+    with pytest.raises(KeyboardInterrupt, match="SIGINT during recovery save"):
         await svc.process_user_response(sim.simulation_id, "some response")
 
 
@@ -172,5 +172,7 @@ async def test_system_exit_not_swallowed():
     svc = _make_service(_make_state_service(sim, update_side_effect))
     _stub_create_idea(svc)
 
-    with pytest.raises((SystemExit, RuntimeError)):
+    with pytest.raises(SystemExit) as exc_info:
         await svc.process_user_response(sim.simulation_id, "some response")
+
+    assert exc_info.value.code == 1
