@@ -431,8 +431,7 @@ class SimulationService:
                 # Try to recover the simulation state if possible
                 if 'simulation' in locals() and simulation:
                     self.state_service.update_simulation(simulation)
-                    return simulation
-            except:
+            except Exception:
                 pass
             raise
 
