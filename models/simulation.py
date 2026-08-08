@@ -1,8 +1,29 @@
 from typing import List, Dict, Any, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import json
+import re
 import uuid
+
+# ASCII control chars (< 0x20 except tab/newline/CR) plus Unicode bidi and zero-width chars
+# that are commonly used in prompt-injection attacks against LLMs.
+_CONTROL_CHARS = re.compile(
+    r"[\x00-\x08\x0B\x0C\x0E-\x1F"
+    r"​-‏"   # zero-width space/non-joiner/joiner/LRM/RLM
+    r"‪-‮"   # bidi embedding/override characters
+    r"⁦-⁩"   # bidi isolate characters
+    r"  "    # line/paragraph separators
+    r"﻿"          # byte-order mark
+    r"]"
+)
+
+
+def _strip_control_chars(v):
+    """Remove disallowed ASCII control characters, passing non-strings through unchanged."""
+    if not isinstance(v, str):
+        return v
+    return _CONTROL_CHARS.sub("", v)
+
 
 # Custom JSON encoder to handle datetime objects
 class DateTimeEncoder(json.JSONEncoder):
@@ -223,12 +244,22 @@ class SimulationState(BaseModel):
 
 class SimulationRequest(BaseModel):
     """Model for requesting a new simulation."""
-    initial_prompt: Optional[str] = None
+    initial_prompt: Optional[str] = Field(None, max_length=500)
     developer_mode: bool = False  # Flag to enable developer mode
+
+    @field_validator("initial_prompt", mode="before")
+    @classmethod
+    def strip_control_chars_initial_prompt(cls, v: Optional[str]) -> Optional[str]:
+        return _strip_control_chars(v)
 
 class UserResponseRequest(BaseModel):
     """Model for submitting a user response."""
-    response_text: str
+    response_text: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("response_text", mode="before")
+    @classmethod
+    def strip_control_chars_response_text(cls, v: str) -> str:
+        return _strip_control_chars(v)
 
 class DeveloperModeRequest(BaseModel):
     """Model for toggling developer mode."""
