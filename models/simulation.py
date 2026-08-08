@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
 from datetime import datetime
 import json
+import uuid
 
 # Custom JSON encoder to handle datetime objects
 class DateTimeEncoder(json.JSONEncoder):
@@ -51,7 +52,7 @@ class SimulationTurn(BaseModel):
 
 class SimulationState(BaseModel):
     """Model representing the complete state of a simulation."""
-    simulation_id: str = Field(default_factory=lambda: f"sim_{datetime.now().strftime('%Y%m%d%H%M%S')}")
+    simulation_id: str = Field(default_factory=lambda: f"sim_{uuid.uuid4().hex[:12]}")
     current_turn_number: int = 1  # Keeping for backward compatibility temporarily
     submission_count: int = 0  # NEW: Counter that increments on each POST request
     max_turns: int = 3  # Configurable max submissions before conclusion
