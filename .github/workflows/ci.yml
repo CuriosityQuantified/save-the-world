@@ -66,6 +66,10 @@ jobs:
         run: npx playwright test tests-e2e/leaderboard.spec.js --project=chromium --reporter=line
         env:
           CI: true
+      - name: Run difficulty regression suite
+        run: npx playwright test tests-e2e/difficulty.spec.js --project=chromium --reporter=line
+        env:
+          CI: true
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

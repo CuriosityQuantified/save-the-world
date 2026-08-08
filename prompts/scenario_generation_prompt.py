@@ -420,7 +420,37 @@ def get_formatted_prompt_template(current_turn_number, max_turns):
   else:
     # Use TURN_GENERATION_TEMPLATE for all other playable turns (2, 3, etc.)
     # IMPORTANT: We do NOT return FINAL_TURN_TEMPLATE here for turn 3
-    # The FINAL_TURN_TEMPLATE is selected directly in the LLM service 
+    # The FINAL_TURN_TEMPLATE is selected directly in the LLM service
     # when is_conclusion_generation=True (after the final user response)
     # This ensures turn 3 (when max_turns=3) still shows user_prompt
     return TURN_GENERATION_TEMPLATE
+
+
+DIFFICULTY_INSTRUCTIONS = {
+    "easy": {
+        "scenario_complexity": "Keep the scenario simple and fun. The crisis should be manageable with one clear approach. Avoid overwhelming complexity or multiple simultaneous problems.",
+        "grading_instructions": "Be generous and encouraging. A well-intentioned response with a reasonable approach deserves 60-80. Reserve scores below 30 only for truly unhelpful one-word or completely irrelevant responses. The player is learning, so focus on what they did right."
+    },
+    "normal": {
+        "scenario_complexity": "",  # no override — use default template
+        "grading_instructions": ""  # no override — use default template
+    },
+    "hard": {
+        "scenario_complexity": "Make the scenario highly complex with multiple simultaneous crises, difficult trade-offs, and serious long-term consequences. Include unexpected complications that require creative multi-faceted solutions.",
+        "grading_instructions": "Apply extremely high standards. Most responses should score below 50. Reserve 80+ only for truly exceptional, comprehensive solutions that address every facet of the crisis. Penalize generic, vague, or surface-level responses harshly. One or two clever sentences deserves at most 30."
+    }
+}
+
+
+def get_difficulty_instructions(difficulty: str) -> dict:
+    """
+    Return difficulty-specific prompt instructions.
+
+    Args:
+        difficulty: The difficulty level string ("easy", "normal", "hard")
+
+    Returns:
+        A dict with "scenario_complexity" and "grading_instructions" keys.
+        Empty strings mean "use the default template text".
+    """
+    return DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS["normal"])

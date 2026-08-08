@@ -16,7 +16,7 @@ import traceback
 from services.llm_service import LLMService
 from services.state_service import StateService
 from services.media_service import MediaService
-from models.simulation import SimulationState, Scenario, LLMLog
+from models.simulation import SimulationState, Scenario, LLMLog, DifficultyLevel
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class SimulationService:
             simulation.add_llm_log(turn_number, llm_log)
             self.state_service.update_simulation(simulation)
 
-    async def create_new_simulation(self, initial_prompt: Optional[str] = None, developer_mode: bool = False) -> SimulationState:
+    async def create_new_simulation(self, initial_prompt: Optional[str] = None, developer_mode: bool = False, difficulty: str = "normal") -> SimulationState:
         """
         Create a new simulation.
 
@@ -90,6 +90,7 @@ class SimulationService:
             # Create a new simulation state
             simulation = SimulationState()
             simulation.developer_mode = developer_mode
+            simulation.difficulty = DifficultyLevel(difficulty)
 
             # Add it to the state service
             self.state_service.create_simulation(simulation)
@@ -116,7 +117,8 @@ class SimulationService:
                 "current_turn_number": 1,
                 "previous_turn_number": 0,
                 "user_prompt_for_this_turn": initial_prompt or "",
-                "max_turns": simulation.max_turns
+                "max_turns": simulation.max_turns,
+                "difficulty": simulation.difficulty.value
             }
 
             # Generate a single scenario
@@ -243,9 +245,10 @@ class SimulationService:
                     "current_turn_number": current_turn,  # Keep current_turn_number the same but the template will know to use FINAL_TURN_TEMPLATE
                     "previous_turn_number": current_turn - 1,
                     "user_prompt_for_this_turn": user_response,  # Pass the user's final response
-                    "max_turns": simulation.max_turns
+                    "max_turns": simulation.max_turns,
+                    "difficulty": simulation.difficulty.value
                 }
-                
+
                 logger.info(f"[CONCLUSION] Context prepared: turn={context['current_turn_number']}, has_user_prompt={bool(context['user_prompt_for_this_turn'])}")
                 
                 # Mark as complete since we've reached max submissions
@@ -270,7 +273,8 @@ class SimulationService:
                         "current_turn_number": current_turn,
                         "previous_turn_number": current_turn - 1,
                         "user_prompt_for_this_turn": user_response,
-                        "max_turns": simulation.max_turns
+                        "max_turns": simulation.max_turns,
+                        "difficulty": simulation.difficulty.value
                     }
                     logger.info(f"[CONCLUSION] Forced conclusion generation due to turn overflow")
                 else:
@@ -282,7 +286,8 @@ class SimulationService:
                         "current_turn_number": next_regular_turn,
                         "previous_turn_number": current_turn,
                         "user_prompt_for_this_turn": "", # Default for regular next turn
-                        "max_turns": simulation.max_turns
+                        "max_turns": simulation.max_turns,
+                        "difficulty": simulation.difficulty.value
                     }
                     # is_complete remains False
 
@@ -440,4 +445,35 @@ class SimulationService:
         except Exception as e:
             logger.error(f"Error toggling developer mode in SimulationService: {str(e)}")
             logger.error(traceback.format_exc())
-            raise 
+            raise
+
+    async def change_difficulty(self, simulation_id: str, difficulty: str) -> Optional[SimulationState]:
+        """
+        Change the difficulty level for a simulation mid-game.
+
+        Args:
+            simulation_id: The ID of the simulation
+            difficulty: The new difficulty level ("easy", "normal", "hard")
+
+        Returns:
+            The updated SimulationState, or None if the simulation wasn't found
+        """
+        try:
+            simulation = self.state_service.get_simulation(simulation_id)
+            if not simulation:
+                logger.error(f"Simulation not found: {simulation_id}")
+                return None
+
+            if simulation.is_complete:
+                logger.info(f"[DIFFICULTY] Simulation {simulation_id} is complete; difficulty change ignored")
+                return simulation
+
+            simulation.difficulty = DifficultyLevel(difficulty)
+            self.state_service.update_simulation(simulation)
+            logger.info(f"[DIFFICULTY] Changed difficulty to {difficulty} for simulation {simulation_id}")
+
+            return simulation
+        except Exception as e:
+            logger.error(f"Error changing difficulty in SimulationService: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise

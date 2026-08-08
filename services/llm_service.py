@@ -23,6 +23,7 @@ from prompts import (INITIAL_CRISIS_EXAMPLES_JSON,
                      FINAL_CONCLUSION_EXAMPLE_JSON)
 from prompts.scenario_generation_prompt import (
     get_formatted_prompt_template,
+    get_difficulty_instructions,
     PERSONALITY_DESCRIPTION,
     CONTEXT,
     ABSURDITY_PRINCIPLES
@@ -209,6 +210,7 @@ class LLMService:
         user_prompt_for_this_turn = context.get("user_prompt_for_this_turn",
                                                 "")
         max_turns = context.get("max_turns", 3)
+        difficulty = context.get("difficulty", "normal")
 
         # For single scenario generation, we set num_ideas to 1
         num_ideas = 1
@@ -262,6 +264,15 @@ class LLMService:
             user_prompt_for_this_turn=user_prompt_for_this_turn,
             num_ideas=num_ideas,
             example_json_output=example_json_output)
+
+        # Inject difficulty-specific instructions
+        difficulty_instructions = get_difficulty_instructions(difficulty)
+        if difficulty_instructions["scenario_complexity"] and not is_conclusion_generation:
+            formatted_prompt += f"\n\nDIFFICULTY MODIFIER (complexity): {difficulty_instructions['scenario_complexity']}"
+        if difficulty_instructions["grading_instructions"] and is_conclusion_generation:
+            formatted_prompt += f"\n\nDIFFICULTY MODIFIER (grading): {difficulty_instructions['grading_instructions']}"
+        if difficulty != "normal":
+            logger.info(f"[DIFFICULTY] Applied {difficulty} difficulty instructions to prompt")
 
         # Execute LLM request with retries and fallbacks
         result = ""
