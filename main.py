@@ -27,6 +27,15 @@ def find_available_port(start_port=8000, max_port=8100):
             port += 1
     raise RuntimeError(f"Could not find an available port in range {start_port}-{max_port}")
 
+def resolve_reload() -> bool:
+    """Resolve the uvicorn auto-reload flag from the RELOAD env var.
+
+    Defaults to OFF so production never spawns a file-system watcher. Only the
+    exact (case-insensitive) value "true" enables reload; unset/empty/"false"/
+    "0"/any other value stays False.
+    """
+    return os.getenv("RELOAD", "false").lower() == "true"
+
 if __name__ == "__main__":
     # Load environment variables
     load_dotenv()
@@ -64,7 +73,7 @@ if __name__ == "__main__":
             "api.app:app", 
             host=host, 
             port=port, 
-            reload=True,
+            reload=resolve_reload(),
             # Add configuration to better handle socket reuse
             log_level="info",
             timeout_keep_alive=65
