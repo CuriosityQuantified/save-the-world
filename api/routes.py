@@ -398,9 +398,17 @@ async def websocket_endpoint(
                 "type": "echo",
                 "message": data
             }))
-    except WebSocketDisconnect:
-        # Remove the connection from the active connections
-        if simulation_id in active_connections:
+    except Exception as exc:
+        # Suppress errors from the receive loop (disconnect or network failure).
+        # Log at debug level so abnormal disconnects are traceable without noise.
+        # Cleanup is handled unconditionally in the finally block below.
+        logger.debug("WebSocket receive loop exited for %s: %s", simulation_id, exc)
+    finally:
+        # Always remove the connection from active_connections, regardless of
+        # whether the disconnect was clean (WebSocketDisconnect) or abnormal
+        # (RuntimeError, ConnectionResetError, etc.).  Without this, stale
+        # WebSocket objects accumulate and cause unbounded dict growth (#19).
+        if simulation_id in active_connections and websocket in active_connections[simulation_id]:
             active_connections[simulation_id].remove(websocket)
             if not active_connections[simulation_id]:
                 del active_connections[simulation_id]
