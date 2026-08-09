@@ -12,6 +12,18 @@ const DIFFICULTY_STYLES = {
   hard:   { color: "#ff4444", bg: "rgba(255,68,68,0.08)",   activeBg: "#440000", label: "HARD",   badge: "CRISIS EXPERT"  },
 };
 
+// Visual styling per theme (issue #7). Orthogonal to difficulty.
+const THEME_STYLES = {
+  classic:       { color: "#cccccc", bg: "rgba(204,204,204,0.08)", activeBg: "#333333", label: "CLASSIC",       badge: "ABSURD CRISIS"    },
+  scifi:         { color: "#00e5ff", bg: "rgba(0,229,255,0.08)",   activeBg: "#00323b", label: "SCI-FI",        badge: "SPACE AGE"        },
+  historical:    { color: "#d4a017", bg: "rgba(212,160,23,0.08)",  activeBg: "#3b2e07", label: "HISTORICAL",    badge: "MAKING HISTORY"   },
+  business:      { color: "#7c5cff", bg: "rgba(124,92,255,0.08)",  activeBg: "#231b47", label: "BUSINESS",      badge: "BOARDROOM"        },
+  environmental: { color: "#4ade80", bg: "rgba(74,222,128,0.08)",  activeBg: "#0f3b22", label: "ENVIRONMENTAL", badge: "PLANET GUARDIAN"  },
+  political:     { color: "#ff6b6b", bg: "rgba(255,107,107,0.08)", activeBg: "#3b1414", label: "POLITICAL",     badge: "STATESMAN"        },
+};
+
+const THEME_ORDER = ["classic", "scifi", "historical", "business", "environmental", "political"];
+
 export default function SimulationPage({ initialScenario }) {
   // Removed scenarioText state - using history instead
 
@@ -50,6 +62,7 @@ export default function SimulationPage({ initialScenario }) {
   // State for managing simulation initialization
   const [simulationStarted, setSimulationStarted] = useState(false);
   const [difficulty, setDifficulty] = useState("normal"); // "easy" | "normal" | "hard"
+  const [theme, setTheme] = useState("classic"); // classic | scifi | historical | business | environmental | political
   
   // State for backend port discovery
   const [backendPort, setBackendPort] = useState(8000);
@@ -437,7 +450,8 @@ export default function SimulationPage({ initialScenario }) {
         body: JSON.stringify({
             initial_prompt: "Start a new simulation.", // Example initial prompt
             developer_mode: false, // Assuming default behavior
-            difficulty: difficulty
+            difficulty: difficulty,
+            theme: theme
         }),
         signal: controller.signal // Add abort signal for timeout
       });
@@ -1128,6 +1142,51 @@ export default function SimulationPage({ initialScenario }) {
               </div>
             </div>
 
+            {/* Theme Selector */}
+            <div
+              data-testid="theme-selector"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "4px",
+              }}
+            >
+              <div style={{
+                fontFamily: '"Press Start 2P", cursive',
+                fontSize: "0.45em",
+                color: "#9ca3af",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+              }}>
+                Theme
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px", maxWidth: "300px" }}>
+                {THEME_ORDER.map((t) => (
+                  <button
+                    key={t}
+                    data-testid={`theme-${t}`}
+                    onClick={() => setTheme(t)}
+                    style={{
+                      padding: "6px 10px",
+                      fontFamily: '"Press Start 2P", cursive',
+                      fontSize: "0.4em",
+                      textTransform: "uppercase",
+                      border: theme === t ? `2px solid ${THEME_STYLES[t].color}` : "2px solid #555",
+                      borderRadius: "4px",
+                      backgroundColor: theme === t ? THEME_STYLES[t].activeBg : "#111",
+                      color: theme === t ? THEME_STYLES[t].color : "#666",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {THEME_STYLES[t].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               type="button"
               data-testid="settings-button"
@@ -1346,6 +1405,61 @@ export default function SimulationPage({ initialScenario }) {
           >
             Settings
           </button>
+        </div>
+
+        {/* Theme Indicator + Mid-Game Change */}
+        <div
+          data-testid="theme-indicator"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            marginBottom: "10px",
+          }}
+        >
+          <span style={{
+            fontFamily: '"Press Start 2P", cursive',
+            fontSize: "0.45em",
+            color: THEME_STYLES[theme].color,
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+          }}>
+            {THEME_STYLES[theme].label}
+          </span>
+          {!showConclusion && (
+            <button
+              data-testid="theme-change-btn"
+              onClick={async () => {
+                const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
+                setTheme(next);
+                if (simulationId) {
+                  try {
+                    await fetch(`${backendUrl}/simulations/${simulationId}/theme`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ theme: next }),
+                    });
+                  } catch (e) {
+                    console.error("Failed to update theme on server:", e);
+                  }
+                }
+              }}
+              style={{
+                fontFamily: '"Press Start 2P", cursive',
+                fontSize: "0.35em",
+                padding: "2px 6px",
+                backgroundColor: "#111",
+                color: "#666",
+                border: "1px solid #444",
+                borderRadius: "3px",
+                cursor: "pointer",
+                textTransform: "uppercase",
+              }}
+            >
+              Change
+            </button>
+          )}
         </div>
 
         {/* Content Grid */}

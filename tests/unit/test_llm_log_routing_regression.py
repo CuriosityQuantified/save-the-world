@@ -31,7 +31,7 @@ class RecordingLLMService:
             "user_prompt": "Act now",
         }
 
-    async def create_video_prompt(self, scenario, turn_number=1, simulation_id=None):
+    async def create_video_prompt(self, scenario, turn_number=1, simulation_id=None, theme="classic"):
         self.video_simulation_ids.append(simulation_id)
         return ["scene 1", "scene 2", "scene 3", "scene 4"]
 

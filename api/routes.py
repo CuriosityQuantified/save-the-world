@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 import io
 import logging
 import json
-from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest, DifficultyChangeRequest
+from models.simulation import SimulationRequest, UserResponseRequest, SimulationState, DateTimeEncoder, DeveloperModeRequest, DifficultyChangeRequest, ThemeChangeRequest
 from models.leaderboard import LeaderboardEntry, LeaderboardSubmitRequest, TimePeriod, extract_grade
 
 from services.simulation_service import SimulationService
@@ -51,7 +51,8 @@ async def create_simulation(
         simulation = await simulation_service.create_new_simulation(
             request.initial_prompt,
             developer_mode=request.developer_mode,
-            difficulty=request.difficulty.value
+            difficulty=request.difficulty.value,
+            theme=request.theme.value
         )
         return simulation
     except Exception as e:
@@ -231,6 +232,34 @@ async def change_difficulty(
     except Exception as e:
         logger.error(f"Error changing difficulty: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to change difficulty: {str(e)}")
+
+
+@router.put("/simulations/{simulation_id}/theme", response_model=SimulationState)
+async def change_theme(
+    simulation_id: str,
+    request: ThemeChangeRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service)
+):
+    """
+    Change the scenario theme for a simulation mid-game.
+
+    Args:
+        simulation_id: The ID of the simulation
+        request: The new theme
+
+    Returns:
+        The updated SimulationState
+    """
+    try:
+        simulation = await simulation_service.change_theme(simulation_id, request.theme.value)
+        if not simulation:
+            raise HTTPException(status_code=404, detail=f"Simulation not found: {simulation_id}")
+        return simulation
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error changing theme: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to change theme: {str(e)}")
 
 
 @router.get("/simulations", response_model=List[SimulationState])

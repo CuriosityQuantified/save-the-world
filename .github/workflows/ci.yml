@@ -78,6 +78,10 @@ jobs:
         run: npx playwright test tests-e2e/difficulty.spec.js --project=chromium --reporter=line
         env:
           CI: true
+      - name: Run theme regression suite
+        run: npx playwright test tests-e2e/theme.spec.js --project=chromium --reporter=line
+        env:
+          CI: true
       - name: Run tutorial regression suite
         run: npx playwright test tests-e2e/tutorial.spec.js --project=chromium --reporter=line
         env:

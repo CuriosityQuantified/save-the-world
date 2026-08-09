@@ -454,3 +454,106 @@ def get_difficulty_instructions(difficulty: str) -> dict:
         Empty strings mean "use the default template text".
     """
     return DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS["normal"])
+
+
+# Theme packs (issue #7). Each theme steers the scenario's SETTING and VISUAL
+# STYLE only — it never contains grading/scoring language, so difficulty stays
+# balanced across every theme (grading is governed solely by difficulty).
+# "classic" is the default and applies no override, preserving the existing
+# absurdist crisis behavior. Flavor text is written to keep each theme's
+# narrative self-consistent across turns.
+THEME_INSTRUCTIONS = {
+    "classic": {
+        "scenario_flavor": "",  # no override — use the default absurdist crisis behavior
+        "visual_style": "",     # no override — use the default cinematography
+    },
+    "scifi": {
+        "scenario_flavor": (
+            "Set every crisis in a science-fiction future: interstellar colonies, "
+            "sentient AI, faster-than-light travel, orbital habitats, alien first "
+            "contact, or runaway nanotechnology. Keep the tone speculative and "
+            "high-tech, and keep names, factions, and technologies consistent from "
+            "turn to turn so the narrative feels like one continuous space-age saga."
+        ),
+        "visual_style": (
+            "Cinematic sci-fi cinematography: sleek starships, neon-lit control "
+            "decks, holographic interfaces, deep-space vistas, and futuristic cities "
+            "with a cool blue-and-cyan palette."
+        ),
+    },
+    "historical": {
+        "scenario_flavor": (
+            "Ground every crisis in a pivotal moment from human history: ancient "
+            "empires, great voyages of exploration, industrial revolutions, or "
+            "wartime crossroads. Frame the player as a leader facing a real "
+            "historical dilemma, and keep the era, place, and cast of figures "
+            "consistent across turns so the story reads like one unfolding chapter "
+            "of history."
+        ),
+        "visual_style": (
+            "Period-accurate historical cinematography: candle- and torch-lit "
+            "interiors, weathered architecture, era-appropriate costume and "
+            "craftsmanship, painterly warm tones and dramatic natural light."
+        ),
+    },
+    "business": {
+        "scenario_flavor": (
+            "Cast every crisis as a high-stakes corporate strategy challenge: "
+            "market disruptions, supply-chain collapses, hostile takeovers, product "
+            "launches gone wrong, or boardroom power struggles. Put the player in an "
+            "executive role and keep the company, its brand, and its rivals "
+            "consistent from turn to turn so the narrative follows one continuous "
+            "business saga."
+        ),
+        "visual_style": (
+            "Modern corporate cinematography: glass-walled boardrooms, city-skyline "
+            "office towers, trading-floor screens, crisp professional lighting and a "
+            "clean contemporary palette."
+        ),
+    },
+    "environmental": {
+        "scenario_flavor": (
+            "Center every crisis on the planet's ecology and sustainability: climate "
+            "breakdown, collapsing ecosystems, resource scarcity, pollution "
+            "disasters, or the race to green energy. Frame the player as a steward of "
+            "the environment and keep the region, ecosystem, and stakeholders "
+            "consistent across turns so the narrative tells one continuous story of "
+            "planetary stewardship."
+        ),
+        "visual_style": (
+            "Natural, documentary-style cinematography: sweeping landscapes, forests "
+            "and oceans, weather and wildlife, golden-hour light and an earthy green "
+            "and blue palette."
+        ),
+    },
+    "political": {
+        "scenario_flavor": (
+            "Frame every crisis around governance and public policy: diplomatic "
+            "standoffs, elections, legislative battles, civil unrest, or "
+            "international negotiations. Put the player in a leadership role within a "
+            "government or coalition and keep the nation, institutions, and key "
+            "figures consistent from turn to turn so the narrative follows one "
+            "continuous political arc."
+        ),
+        "visual_style": (
+            "Statesmanlike cinematography: grand assembly halls, press-conference "
+            "podiums, flags and civic architecture, formal directional lighting and "
+            "a dignified muted palette."
+        ),
+    },
+}
+
+
+def get_theme_instructions(theme: str) -> dict:
+    """
+    Return theme-specific prompt instructions.
+
+    Args:
+        theme: The theme string ("classic", "scifi", "historical", "business",
+            "environmental", "political").
+
+    Returns:
+        A dict with "scenario_flavor" and "visual_style" keys. Empty strings
+        mean "no theme override" (classic). Unknown themes fall back to classic.
+    """
+    return THEME_INSTRUCTIONS.get(theme, THEME_INSTRUCTIONS["classic"])
