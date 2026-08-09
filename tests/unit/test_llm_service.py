@@ -29,8 +29,8 @@ def llm_service():
 @pytest.mark.asyncio
 async def test_create_idea_final_turn_conclusion_parsing():
     """
-    Tests that create_idea correctly parses a slightly messy JSON output 
-    for the final turn conclusion, using the specified 'qwen-qwq-32b' model.
+    Tests that create_idea correctly parses a slightly messy JSON output
+    for the final turn conclusion, using the specified 'moonshotai/kimi-k2-instruct' model.
     """
     service = LLMService(api_key="test_api_key", huggingface_service=MockHuggingFaceService(api_key="fake_hf_key"))
     service.log_callback = AsyncMock() # Mock the log_callback
@@ -44,9 +44,8 @@ async def test_create_idea_final_turn_conclusion_parsing():
         "max_turns": 6
     }
 
-    # Expected output structure for a final conclusion
-    # Based on FINAL_TURN_TEMPLATE, it should be a single object, not a list in the example
-    # The _parse_json_scenarios now wraps single dicts in a list.
+    # Expected output structure for a final conclusion.
+    # create_idea returns a single dict for the conclusion (final) turn.
     mock_llm_output_json = {
         "situation_description": "The world is saved, with a lingering scent of existential absurdity!",
         "rationale": "User displayed excellent problem-solving skills under bizarre pressure.",
@@ -62,35 +61,14 @@ async def test_create_idea_final_turn_conclusion_parsing():
 ```
     """
 
-    # Mock the Groq client's chat.completions.create method
-    # This is the primary method used for 'qwen-qwq-32b' as per current llm_service logic for final turn
-    mock_groq_completion = MagicMock()
-    mock_groq_completion.choices = [MagicMock()]
-    mock_groq_completion.choices[0].message.content = messy_llm_response_str
-    
-    # The Groq client itself
-    mock_groq_client = MagicMock()
-    mock_groq_client.chat.completions.create = AsyncMock(return_value=mock_groq_completion) # Use AsyncMock for async context
+    # Patch the actual code path: create_idea drives the LLM via LangChain's
+    # LLMChain.arun (with a ChatGroq instance), NOT service.groq_client.
+    with patch("langchain.chains.LLMChain.arun", new_callable=AsyncMock, return_value=messy_llm_response_str):
+        generated_scenario = await service.create_idea(final_turn_context)
 
-    # Patch the Groq client instance within the service or where it's instantiated.
-    # Assuming self.groq_client is used:
-    with patch.object(service, 'groq_client', mock_groq_client):
-        generated_scenario_list = await service.create_idea(final_turn_context)
-
-    # Assertions
-    assert generated_scenario_list is not None, "create_idea should return a list of scenarios"
-    assert len(generated_scenario_list) == 1, "Expected one scenario for the conclusion"
-    
-    generated_scenario = generated_scenario_list[0]
-
-    # Check that the correct model was intended to be used (qwen-qwq-32b for final turn)
-    # The actual call is mocked, but we check if the logic path for qwen-qwq-32b would be taken.
-    # We can infer this if groq_client.chat.completions.create was called.
-    service.groq_client.chat.completions.create.assert_called_once()
-    call_args = service.groq_client.chat.completions.create.call_args
-    assert call_args is not None, "Groq client was not called as expected"
-    assert call_args.kwargs.get('model') == "qwen-qwq-32b", "Incorrect model specified for final turn"
-
+    # Assertions -- create_idea returns a single dict for the conclusion turn.
+    assert generated_scenario is not None, "create_idea should return a scenario dict"
+    assert isinstance(generated_scenario, dict), "create_idea should return a dictionary for the conclusion"
 
     # Check that the parsed scenario contains the expected fields and values
     assert generated_scenario['situation_description'] == mock_llm_output_json['situation_description']
@@ -101,7 +79,7 @@ async def test_create_idea_final_turn_conclusion_parsing():
     # Ensure no extra fields like user_role or user_prompt are present for conclusion
     assert 'user_role' not in generated_scenario
     assert 'user_prompt' not in generated_scenario
-    
+
     # Check that an ID was added during validation (even if not in LLM output)
     assert 'id' in generated_scenario
     assert generated_scenario['id'] == f"scenario_{final_turn_context['current_turn_number']}_1"
@@ -110,14 +88,14 @@ async def test_create_idea_final_turn_conclusion_parsing():
     service.log_callback.assert_called_once()
     log_args = service.log_callback.call_args[0] # Get positional arguments of the call
     assert log_args[1].operation_name == "create_idea"
-    assert log_args[1].model_name == "qwen-qwq-32b"
+    assert log_args[1].model_name == "moonshotai/kimi-k2-instruct"
     # Further checks on log_args[1].prompt and log_args[1].completion can be added
 
 
 @pytest.mark.asyncio
 async def test_create_idea_final_turn_fallback_parsing():
     """
-    Tests that create_idea correctly parses a final turn conclusion 
+    Tests that create_idea correctly parses a final turn conclusion
     when the JSON is not perfectly clean and requires the find '{' '}' fallback.
     """
     service = LLMService(api_key="test_api_key", huggingface_service=MockHuggingFaceService(api_key="fake_hf_key"))
@@ -136,19 +114,12 @@ async def test_create_idea_final_turn_fallback_parsing():
     # Simulate LLM response with leading garbage and no markdown, forcing find {' '}'
     messy_llm_response_str = f"Some unexpected text before the JSON... \n {json.dumps(mock_llm_output_json)} \n ...and some after."
 
-    mock_groq_completion = MagicMock()
-    mock_groq_completion.choices = [MagicMock()]
-    mock_groq_completion.choices[0].message.content = messy_llm_response_str
-    
-    mock_groq_client = MagicMock()
-    mock_groq_client.chat.completions.create = AsyncMock(return_value=mock_groq_completion)
+    # Patch the actual code path: LLMChain.arun drives the LLM, not service.groq_client.
+    with patch("langchain.chains.LLMChain.arun", new_callable=AsyncMock, return_value=messy_llm_response_str):
+        generated_scenario = await service.create_idea(final_turn_context)
 
-    with patch.object(service, 'groq_client', mock_groq_client):
-        generated_scenario_list = await service.create_idea(final_turn_context)
-
-    assert generated_scenario_list is not None
-    assert len(generated_scenario_list) == 1
-    generated_scenario = generated_scenario_list[0]
+    assert generated_scenario is not None
+    assert isinstance(generated_scenario, dict)
 
     assert generated_scenario['situation_description'] == mock_llm_output_json['situation_description']
     assert generated_scenario['grade'] == mock_llm_output_json['grade']
@@ -156,7 +127,8 @@ async def test_create_idea_final_turn_fallback_parsing():
 
     service.log_callback.assert_called_once()
     log_args = service.log_callback.call_args[0]
-    assert log_args[1].model_name == "qwen-qwq-32b"
+    assert log_args[1].operation_name == "create_idea"
+    assert log_args[1].model_name == "moonshotai/kimi-k2-instruct"
 
 
 @pytest.mark.asyncio
@@ -211,49 +183,3 @@ async def test_create_idea_live_groq_call():
     # For now, just check that a model_name is logged.
     assert log_args[1].model_name is not None and len(log_args[1].model_name) > 0, "Model name not logged"
     assert log_args[1].completion is not None # Ensure some completion was logged
-
-
-    # The following test is for final turn fallback parsing, ensure it's correctly placed
-    @pytest.mark.asyncio
-    async def test_create_idea_final_turn_fallback_parsing():
-        """
-        Tests that create_idea correctly parses a final turn conclusion 
-        when the JSON is not perfectly clean and requires the find '{' '}' fallback.
-        """
-        service = LLMService(api_key="test_api_key", huggingface_service=MockHuggingFaceService(api_key="fake_hf_key"))
-        service.log_callback = AsyncMock()
-
-        final_turn_context = {
-            "simulation_history": "History...", "current_turn_number": 6, "max_turns": 6,
-            "previous_turn_number": 5, "user_prompt_for_this_turn": "Final response"
-        }
-        mock_llm_output_json = {
-            "situation_description": "Fallback test success.",
-            "rationale": "Fallback rationale.",
-            "grade": 75,
-            "grade_explanation": "Fallback explanation."
-        }
-        # Simulate LLM response with leading garbage and no markdown, forcing find {' '}'
-        messy_llm_response_str = f"Some unexpected text before the JSON... \n {json.dumps(mock_llm_output_json)} \n ...and some after."
-
-        mock_groq_completion = MagicMock()
-        mock_groq_completion.choices = [MagicMock()]
-        mock_groq_completion.choices[0].message.content = messy_llm_response_str
-        
-        mock_groq_client = MagicMock()
-        mock_groq_client.chat.completions.create = AsyncMock(return_value=mock_groq_completion)
-
-        with patch.object(service, 'groq_client', mock_groq_client):
-            generated_scenario_list = await service.create_idea(final_turn_context)
-
-        assert generated_scenario_list is not None
-        assert len(generated_scenario_list) == 1
-        generated_scenario = generated_scenario_list[0]
-
-        assert generated_scenario['situation_description'] == mock_llm_output_json['situation_description']
-        assert generated_scenario['grade'] == mock_llm_output_json['grade']
-        assert 'id' in generated_scenario
-
-        service.log_callback.assert_called_once()
-        log_args = service.log_callback.call_args[0]
-        assert log_args[1].model_name == "qwen-qwq-32b" 

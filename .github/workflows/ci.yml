@@ -33,11 +33,15 @@ jobs:
         run: pytest tests/unit/test_requirements_alignment.py -q
       - name: Run uvicorn reload gating regression
         run: pytest tests/unit/test_uvicorn_reload_regression.py -q
+      - name: Run LLM service final-turn parsing regression
+        run: pytest tests/unit/test_llm_service.py::test_create_idea_final_turn_conclusion_parsing tests/unit/test_llm_service.py::test_create_idea_final_turn_fallback_parsing -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
-        # (leave them for those issue-workers; don't scope-creep or race them):
-        #   - test_cloudflare_r2_service upload/get_url/error  -> #22
-        #   - test_llm_service final-turn parsing (LLMChain)   -> #24
+        # (leave them for those issue-workers; don't scope-creep or race them).
+        # The llm_service final-turn parsing tests were fixed by #22 (they had mocked
+        # the wrong code path -- service.groq_client instead of LLMChain.arun) and now
+        # run in the general suite plus the named regression step above.
+        #   - test_cloudflare_r2_service upload/get_url/error  -> its own R2 issue
         #   - test_media_utils::test_ensure_media_directories  -> #13 (env/media dir)
         run: pytest tests/unit/ -q
           --deselect tests/unit/test_cloudflare_r2_service.py::test_upload_video_public
@@ -45,8 +49,6 @@ jobs:
           --deselect tests/unit/test_cloudflare_r2_service.py::test_upload_audio_public
           --deselect tests/unit/test_cloudflare_r2_service.py::test_get_file_url_private
           --deselect tests/unit/test_cloudflare_r2_service.py::test_upload_video_error
-          --deselect tests/unit/test_llm_service.py::test_create_idea_final_turn_conclusion_parsing
-          --deselect tests/unit/test_llm_service.py::test_create_idea_final_turn_fallback_parsing
           --deselect tests/unit/test_media_utils.py::TestMediaUtils::test_ensure_media_directories
 
   regressions:
