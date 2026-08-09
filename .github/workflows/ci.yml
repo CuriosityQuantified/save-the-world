@@ -25,6 +25,8 @@ jobs:
         run: pytest tests/unit/test_llm_log_routing_regression.py -q
       - name: Run bare-except recovery regression
         run: pytest tests/unit/test_bare_except_regression.py -q
+      - name: Run dead-code removal regression
+        run: pytest tests/unit/test_dead_code_removal_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them):
