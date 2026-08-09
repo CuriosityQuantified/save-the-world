@@ -1,12 +1,24 @@
-fastapi>=0.115.5
-uvicorn>=0.32.1
+# Production runtime dependencies.
+#
+# This is the runtime subset of requirements.txt: every shared package MUST use
+# the exact same version specifier as requirements.txt (one coherent, reproducible
+# dependency contract). The only intentional difference is that this file omits
+# test-only tooling that production never imports: pytest, pytest-asyncio, httpx.
+#
+# tests/unit/test_requirements_alignment.py enforces this alignment and fails if
+# the two files drift, or if removed packages (redis, google-generativeai,
+# langchain-openai) return.
+fastapi==0.115.5
+uvicorn==0.32.1
 python-dotenv==1.0.0
-requests>=2.32.3
-aiohttp>=3.13.3
-groq==0.4.1
-pydantic==2.6.0
-redis==5.0.1
-google-generativeai==0.3.2
+requests==2.32.3
+aiohttp==3.13.3
+groq==0.24.0
+pydantic==2.11.3
 huggingface_hub[inference,cli]>=0.21.0
 boto3==1.34.36
-python-multipart>=0.0.18 
+python-multipart>=0.0.18
+langchain==0.2.17
+langchain-core==0.2.43
+langchain-groq==0.1.10
+langchain-text-splitters==0.2.4
