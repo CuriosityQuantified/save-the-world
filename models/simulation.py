@@ -78,6 +78,17 @@ class DifficultyLevel(str, Enum):
     HARD = "hard"
 
 
+class ThemeType(str, Enum):
+    """Scenario theme packs (issue #7). Orthogonal to difficulty: a theme only
+    changes the scenario setting/flavor and visual style, never grading."""
+    CLASSIC = "classic"            # default — preserves the existing absurdist crisis behavior
+    SCIFI = "scifi"
+    HISTORICAL = "historical"
+    BUSINESS = "business"
+    ENVIRONMENTAL = "environmental"
+    POLITICAL = "political"
+
+
 class SimulationState(BaseModel):
     """Model representing the complete state of a simulation."""
     simulation_id: str = Field(default_factory=lambda: f"sim_{uuid.uuid4().hex[:12]}")
@@ -90,6 +101,7 @@ class SimulationState(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.now)
     developer_mode: bool = False  # Flag to enable/disable developer mode
     difficulty: DifficultyLevel = DifficultyLevel.NORMAL  # Difficulty level for this simulation
+    theme: ThemeType = ThemeType.CLASSIC  # Scenario theme pack for this simulation
 
     def dict(self, *args, **kwargs):
         """
@@ -255,6 +267,7 @@ class SimulationRequest(BaseModel):
     initial_prompt: Optional[str] = Field(None, max_length=500)
     developer_mode: bool = False  # Flag to enable developer mode
     difficulty: DifficultyLevel = DifficultyLevel.NORMAL  # Difficulty level for this simulation
+    theme: ThemeType = ThemeType.CLASSIC  # Scenario theme pack for this simulation
 
     @field_validator("initial_prompt", mode="before")
     @classmethod
@@ -278,3 +291,8 @@ class DeveloperModeRequest(BaseModel):
 class DifficultyChangeRequest(BaseModel):
     """Model for changing difficulty level mid-game."""
     difficulty: DifficultyLevel
+
+
+class ThemeChangeRequest(BaseModel):
+    """Model for changing the scenario theme mid-game."""
+    theme: ThemeType

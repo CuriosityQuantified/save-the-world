@@ -16,7 +16,7 @@ import traceback
 from services.llm_service import LLMService
 from services.state_service import StateService
 from services.media_service import MediaService
-from models.simulation import SimulationState, Scenario, LLMLog, DifficultyLevel
+from models.simulation import SimulationState, Scenario, LLMLog, DifficultyLevel, ThemeType
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class SimulationService:
             simulation.add_llm_log(turn_number, llm_log)
             self.state_service.update_simulation(simulation)
 
-    async def create_new_simulation(self, initial_prompt: Optional[str] = None, developer_mode: bool = False, difficulty: str = "normal") -> SimulationState:
+    async def create_new_simulation(self, initial_prompt: Optional[str] = None, developer_mode: bool = False, difficulty: str = "normal", theme: str = "classic") -> SimulationState:
         """
         Create a new simulation.
 
@@ -98,6 +98,7 @@ class SimulationService:
             simulation = SimulationState()
             simulation.developer_mode = developer_mode
             simulation.difficulty = DifficultyLevel(difficulty)
+            simulation.theme = ThemeType(theme)
 
             # Add it to the state service
             self.state_service.create_simulation(simulation)
@@ -126,6 +127,7 @@ class SimulationService:
                 "user_prompt_for_this_turn": initial_prompt or "",
                 "max_turns": simulation.max_turns,
                 "difficulty": simulation.difficulty.value,
+                "theme": simulation.theme.value,
                 "simulation_id": simulation.simulation_id
             }
 
@@ -167,6 +169,7 @@ class SimulationService:
                     scenario,
                     turn_number=1,
                     simulation_id=simulation.simulation_id,
+                    theme=simulation.theme.value,
                 )
 
                 # Add media prompts to the simulation state - set narration_script to None
@@ -259,6 +262,7 @@ class SimulationService:
                     "user_prompt_for_this_turn": user_response,  # Pass the user's final response
                     "max_turns": simulation.max_turns,
                     "difficulty": simulation.difficulty.value,
+                    "theme": simulation.theme.value,
                     "simulation_id": simulation.simulation_id
                 }
 
@@ -288,6 +292,7 @@ class SimulationService:
                         "user_prompt_for_this_turn": user_response,
                         "max_turns": simulation.max_turns,
                         "difficulty": simulation.difficulty.value,
+                        "theme": simulation.theme.value,
                         "simulation_id": simulation.simulation_id
                     }
                     logger.info(f"[CONCLUSION] Forced conclusion generation due to turn overflow")
@@ -302,6 +307,7 @@ class SimulationService:
                         "user_prompt_for_this_turn": "", # Default for regular next turn
                         "max_turns": simulation.max_turns,
                         "difficulty": simulation.difficulty.value,
+                        "theme": simulation.theme.value,
                         "simulation_id": simulation.simulation_id
                     }
                     # is_complete remains False
@@ -375,6 +381,7 @@ class SimulationService:
                     scenario,
                     turn_number=storage_turn,
                     simulation_id=simulation.simulation_id,
+                    theme=simulation.theme.value,
                 )
 
                 # Add media prompts to the simulation state - set narration_script to None
@@ -493,5 +500,37 @@ class SimulationService:
             return simulation
         except Exception as e:
             logger.error(f"Error changing difficulty in SimulationService: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+
+    async def change_theme(self, simulation_id: str, theme: str) -> Optional[SimulationState]:
+        """
+        Change the scenario theme for a simulation mid-game.
+
+        Args:
+            simulation_id: The ID of the simulation
+            theme: The new theme ("classic", "scifi", "historical", "business",
+                "environmental", "political")
+
+        Returns:
+            The updated SimulationState, or None if the simulation wasn't found
+        """
+        try:
+            simulation = self.state_service.get_simulation(simulation_id)
+            if not simulation:
+                logger.error(f"Simulation not found: {simulation_id}")
+                return None
+
+            if simulation.is_complete:
+                logger.info(f"[THEME] Simulation {simulation_id} is complete; theme change ignored")
+                return simulation
+
+            simulation.theme = ThemeType(theme)
+            self.state_service.update_simulation(simulation)
+            logger.info(f"[THEME] Changed theme to {theme} for simulation {simulation_id}")
+
+            return simulation
+        except Exception as e:
+            logger.error(f"Error changing theme in SimulationService: {str(e)}")
             logger.error(traceback.format_exc())
             raise

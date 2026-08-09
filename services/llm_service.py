@@ -24,6 +24,7 @@ from prompts import (INITIAL_CRISIS_EXAMPLES_JSON,
 from prompts.scenario_generation_prompt import (
     get_formatted_prompt_template,
     get_difficulty_instructions,
+    get_theme_instructions,
     PERSONALITY_DESCRIPTION,
     CONTEXT,
     ABSURDITY_PRINCIPLES
@@ -225,6 +226,7 @@ class LLMService:
                                                 "")
         max_turns = context.get("max_turns", 3)
         difficulty = context.get("difficulty", "normal")
+        theme = context.get("theme", "classic")
         simulation_id = context.get("simulation_id")
 
         # For single scenario generation, we set num_ideas to 1
@@ -288,6 +290,14 @@ class LLMService:
             formatted_prompt += f"\n\nDIFFICULTY MODIFIER (grading): {difficulty_instructions['grading_instructions']}"
         if difficulty != "normal":
             logger.info(f"[DIFFICULTY] Applied {difficulty} difficulty instructions to prompt")
+
+        # Inject theme-specific setting/flavor (orthogonal to difficulty).
+        # Applied to both normal and conclusion turns so the narrative stays
+        # consistent within the theme all the way through the conclusion.
+        theme_instructions = get_theme_instructions(theme)
+        if theme_instructions["scenario_flavor"]:
+            formatted_prompt += f"\n\nTHEME (setting): {theme_instructions['scenario_flavor']}"
+            logger.info(f"[THEME] Applied {theme} theme flavor to prompt")
 
         # Execute LLM request with retries and fallbacks
         result = ""
@@ -419,7 +429,8 @@ class LLMService:
     async def create_video_prompt(self,
                                   scenario: Dict[str, str],
                                   turn_number: int = 1,
-                                  simulation_id: Optional[str] = None) -> List[str]:
+                                  simulation_id: Optional[str] = None,
+                                  theme: str = "classic") -> List[str]:
         """
         Generate a video generation prompt from the scenario details,
         parse it, and return a list of scene descriptions.
@@ -428,12 +439,21 @@ class LLMService:
             scenario: The scenario dictionary with 'situation_description'
             turn_number: The current turn number for logging
             simulation_id: The simulation that initiated this interaction
+            theme: The scenario theme; injects a theme-appropriate visual style
+                into the video prompt so generated media matches the theme.
 
         Returns:
             A list of four scene descriptions. Returns an empty list if parsing fails.
         """
         # Use only the situation_description for the prompt
         scenario_text = scenario.get('situation_description', '')
+
+        # Inject theme-appropriate visual style so generated media matches the
+        # theme. Appended to scenario_text so it reaches BOTH the logged prompt
+        # and the value fed to the LLM chain (which uses input_variables=["scenario"]).
+        theme_instructions = get_theme_instructions(theme)
+        if theme_instructions["visual_style"]:
+            scenario_text += f"\n\nTHEME VISUAL STYLE: {theme_instructions['visual_style']}"
 
         # Use the imported prompt template
         prompt_template = VIDEO_PROMPT_TEMPLATE
