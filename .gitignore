@@ -106,3 +106,9 @@ tasks/
 # Playwright / test artifacts
 playwright-report/
 test-results/
+
+# Graphify generated cache and machine-local metadata
+graphify-out/.graphify_root
+graphify-out/.graphify_analysis.json
+graphify-out/manifest.json
+graphify-out/cache/
