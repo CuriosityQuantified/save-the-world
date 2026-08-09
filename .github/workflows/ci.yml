@@ -31,6 +31,8 @@ jobs:
         run: pytest tests/unit/test_ws_cleanup_regression.py -q
       - name: Run requirements alignment regression
         run: pytest tests/unit/test_requirements_alignment.py -q
+      - name: Run uvicorn reload gating regression
+        run: pytest tests/unit/test_uvicorn_reload_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them):
