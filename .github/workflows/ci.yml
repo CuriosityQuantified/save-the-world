@@ -27,6 +27,8 @@ jobs:
         run: pytest tests/unit/test_bare_except_regression.py -q
       - name: Run dead-code removal regression
         run: pytest tests/unit/test_dead_code_removal_regression.py -q
+      - name: Run WebSocket cleanup regression
+        run: pytest tests/unit/test_ws_cleanup_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them):
