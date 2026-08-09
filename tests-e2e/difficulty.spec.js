@@ -127,6 +127,7 @@ test.describe('Difficulty Levels', () => {
       Object.keys(localStorage)
         .filter((k) => k.startsWith('save-the-world:'))
         .forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem('save-the-world:tutorial-status', 'completed');
     });
     await page.goto('/simulation');
   });

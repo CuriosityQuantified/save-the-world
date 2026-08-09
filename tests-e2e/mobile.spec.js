@@ -32,6 +32,10 @@ test.describe('Mobile Responsiveness', () => {
     await page.addInitScript((key) => {
       localStorage.removeItem(key);
     }, STORAGE_KEY);
+    // Existing mobile regressions exercise the post-onboarding simulation UI.
+    await page.addInitScript(() => {
+      localStorage.setItem('save-the-world:tutorial-status', 'completed');
+    });
   });
 
   test('viewport meta tag is present', async ({ page }) => {

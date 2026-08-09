@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import MediaHandler from "../components/MediaHandler";
+import TutorialOverlay from "../components/TutorialOverlay";
 
 const STORAGE_KEY = 'save-the-world:sim-state';
+const TUTORIAL_STORAGE_KEY = 'save-the-world:tutorial-status';
 
 const DIFFICULTY_STYLES = {
   easy:   { color: "#00ff00", bg: "rgba(0,255,0,0.08)",     activeBg: "#004400", label: "EASY",   badge: "ROOKIE MODE"    },
@@ -58,6 +60,11 @@ export default function SimulationPage({ initialScenario }) {
   const [savedSimulation, setSavedSimulation] = useState(null);
   const [storageWarning, setStorageWarning] = useState(null);
 
+  // Tutorial and settings state
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gameplayHintVisible, setGameplayHintVisible] = useState(true);
+
   // Discover backend port on component mount
   useEffect(() => {
     async function discoverBackendPort() {
@@ -91,6 +98,22 @@ export default function SimulationPage({ initialScenario }) {
     } catch {
       // Corrupted or inaccessible localStorage — ignore silently
     }
+  }, []);
+
+  // Show the walkthrough once for new users. queueMicrotask keeps the first
+  // client render aligned with the server-rendered start screen.
+  useEffect(() => {
+    let active = true;
+    let hasCompletedTutorial = false;
+    try {
+      hasCompletedTutorial = Boolean(localStorage.getItem(TUTORIAL_STORAGE_KEY));
+    } catch {
+      // Private browsing or blocked storage should not prevent the game loading.
+    }
+    queueMicrotask(() => {
+      if (active && !hasCompletedTutorial) setTutorialOpen(true);
+    });
+    return () => { active = false; };
   }, []);
 
   // Persist simulation state to localStorage while a simulation is in progress
@@ -498,7 +521,65 @@ export default function SimulationPage({ initialScenario }) {
     setVideosGenerated(savedSimulation.videosGenerated ?? false);
     setAudioGenerated(savedSimulation.audioGenerated ?? false);
     setSavedSimulation(null);
+    setGameplayHintVisible(true);
     setSimulationStarted(true);
+  };
+
+  const closeTutorial = (status) => {
+    try { localStorage.setItem(TUTORIAL_STORAGE_KEY, status); } catch { /* ignore */ }
+    setTutorialOpen(false);
+    setGameplayHintVisible(true);
+  };
+
+  const replayTutorial = () => {
+    setSettingsOpen(false);
+    setTutorialOpen(true);
+    setGameplayHintVisible(true);
+  };
+
+  const SettingsPanel = () => {
+    if (!settingsOpen) return null;
+    return (
+      <div
+        role="dialog"
+        aria-label="Simulation settings"
+        data-testid="settings-panel"
+        style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          zIndex: 1500,
+          width: "min(320px, calc(100vw - 40px))",
+          padding: "18px",
+          border: "2px solid #555",
+          borderRadius: "8px",
+          backgroundColor: "#111",
+          boxShadow: "0 0 20px rgba(0, 0, 0, 0.7)",
+          fontFamily: '"Press Start 2P", cursive',
+        }}
+      >
+        <h2 style={{ margin: "0 0 12px", color: "#00ff00", fontSize: "0.8em" }}>SETTINGS</h2>
+        <p style={{ margin: "0 0 16px", color: "#aaa", fontFamily: "Arial, sans-serif", fontSize: "14px", lineHeight: 1.4 }}>
+          Need a refresher? Replay the interactive tutorial without leaving your simulation.
+        </p>
+        <button
+          type="button"
+          data-testid="replay-tutorial"
+          onClick={replayTutorial}
+          style={{ minHeight: "44px", width: "100%", padding: "10px", border: "1px solid #00ff00", borderRadius: "5px", backgroundColor: "#123b24", color: "#b7ffca", cursor: "pointer", fontFamily: "inherit", fontSize: "0.55em" }}
+        >
+          Replay Tutorial
+        </button>
+        <button
+          type="button"
+          data-testid="settings-close"
+          onClick={() => setSettingsOpen(false)}
+          style={{ minHeight: "44px", width: "100%", marginTop: "10px", padding: "10px", border: "1px solid #555", borderRadius: "5px", backgroundColor: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit", fontSize: "0.5em" }}
+        >
+          Close
+        </button>
+      </div>
+    );
   };
 
   // Animated checkmark component with fade-in effect
@@ -1048,9 +1129,31 @@ export default function SimulationPage({ initialScenario }) {
             </div>
 
             <button
+              type="button"
+              data-testid="settings-button"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((open) => !open)}
+              style={{
+                minHeight: "44px",
+                padding: "8px 16px",
+                fontSize: "0.5em",
+                fontFamily: '"Press Start 2P", cursive',
+                color: "#d1d5db",
+                backgroundColor: "#111",
+                border: "1px solid #555",
+                borderRadius: "6px",
+                cursor: "pointer",
+                textTransform: "uppercase",
+              }}
+            >
+              Settings
+            </button>
+
+            <button
               className="begin-button sim-touch-btn"
             onClick={() => {
               clearSavedSimulation();
+              setGameplayHintVisible(true);
               setSimulationStarted(true);
               initializeSimulation();
             }}
@@ -1223,6 +1326,26 @@ export default function SimulationPage({ initialScenario }) {
               Change
             </button>
           )}
+          <button
+            type="button"
+            data-testid="settings-button"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+            style={{
+              fontFamily: '"Press Start 2P", cursive',
+              fontSize: "0.35em",
+              padding: "4px 7px",
+              minHeight: "32px",
+              backgroundColor: "#111",
+              color: "#aaa",
+              border: "1px solid #555",
+              borderRadius: "3px",
+              cursor: "pointer",
+              textTransform: "uppercase",
+            }}
+          >
+            Settings
+          </button>
         </div>
 
         {/* Content Grid */}
@@ -1317,6 +1440,39 @@ export default function SimulationPage({ initialScenario }) {
           </div>
         </div>
 
+        {gameplayHintVisible && !showConclusion && (
+          <div
+            role="note"
+            aria-live="polite"
+            data-testid="tutorial-gameplay-hint"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              marginTop: "12px",
+              padding: "10px 12px",
+              border: "1px solid #35594a",
+              borderRadius: "6px",
+              backgroundColor: "rgba(0, 255, 0, 0.07)",
+              color: "#c7d2d0",
+              fontFamily: "Arial, sans-serif",
+              fontSize: "14px",
+              lineHeight: 1.4,
+            }}
+          >
+            <span><strong style={{ color: "#b7ffca" }}>Gameplay tip:</strong> Read the scenario, type a response, and press Send to advance the turn.</span>
+            <button
+              type="button"
+              data-testid="dismiss-tutorial-hint"
+              onClick={() => setGameplayHintVisible(false)}
+              style={{ minHeight: "36px", padding: "6px 10px", flexShrink: 0, border: "1px solid #6b7280", borderRadius: "4px", backgroundColor: "transparent", color: "#d1d5db", cursor: "pointer" }}
+            >
+              Got it
+            </button>
+          </div>
+        )}
+
         {/* User Input Area - Below the grid */}
         <form onSubmit={handleSubmit} style={{
           marginTop: "15px",
@@ -1368,7 +1524,13 @@ export default function SimulationPage({ initialScenario }) {
       </div>
       )}
       
-      {/* Render Conclusion Overlay */}
+      {/* Render overlays */}
+      <SettingsPanel />
+      <TutorialOverlay
+        isOpen={tutorialOpen}
+        onComplete={() => closeTutorial("completed")}
+        onSkip={() => closeTutorial("skipped")}
+      />
       <ConclusionOverlay />
     </div>
   );

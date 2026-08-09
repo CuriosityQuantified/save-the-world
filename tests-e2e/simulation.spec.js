@@ -4,6 +4,13 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(300000); // 5 minutes for thorough testing
 
 test.describe('Save the World Simulation - Comprehensive E2E Test', () => {
+  test.beforeEach(async ({ page }) => {
+    // This legacy flow exercises gameplay after onboarding; the tutorial has
+    // dedicated coverage in tutorial.spec.js.
+    await page.addInitScript(() => {
+      localStorage.setItem('save-the-world:tutorial-status', 'completed');
+    });
+  });
   
   test('Complete end-to-end simulation flow with detailed error tracking', async ({ page, context, request }) => {
     // Setup comprehensive error tracking
