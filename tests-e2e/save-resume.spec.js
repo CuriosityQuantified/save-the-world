@@ -25,6 +25,10 @@ test.describe('Save/Resume Functionality', () => {
     await page.addInitScript((key) => {
       localStorage.removeItem(key);
     }, STORAGE_KEY);
+    // Existing save/resume coverage starts in the post-onboarding state.
+    await page.addInitScript(() => {
+      localStorage.setItem('save-the-world:tutorial-status', 'completed');
+    });
   });
 
   test('Continue button is hidden when no saved simulation exists', async ({ page }) => {
