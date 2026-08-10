@@ -20,6 +20,8 @@ from services.simulation_service import SimulationService
 from services.analytics_service import AnalyticsService
 from services.leaderboard_service import LeaderboardService
 from api.routes import router
+from utils.runtime_paths import get_leaderboard_db_path, get_project_root
+from utils.media import get_media_public_root
 
 # Load environment variables
 load_dotenv()
@@ -67,7 +69,37 @@ async def timeout_middleware(request: Request, call_next):
         raise HTTPException(status_code=504, detail="Request timeout - operation took too long")
 
 # Determine project root directory
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = get_project_root()
+
+
+def _strip_api_prefix(path: str) -> str:
+    """Strip the ``/api`` prefix added by Vercel's catch-all route.
+
+    Local Next.js development already proxies ``/api/*`` to the backend root,
+    while the legacy Vercel route forwards the original path unchanged. Keep
+    the backend compatible with both request shapes.
+    """
+    if path == "/api":
+        return "/"
+    if path.startswith("/api/"):
+        return path[4:]
+    return path
+
+
+@app.middleware("http")
+async def vercel_api_prefix_middleware(request: Request, call_next):
+    """Normalize Vercel ``/api/*`` requests to the backend route paths."""
+    path = request.scope.get("path", "")
+    stripped_path = _strip_api_prefix(path)
+    if stripped_path != path:
+        request.scope["path"] = stripped_path
+        raw_path = request.scope.get("raw_path")
+        if raw_path == b"/api":
+            request.scope["raw_path"] = b"/"
+        elif isinstance(raw_path, bytes) and raw_path.startswith(b"/api/"):
+            # Preserve percent-encoding in the original ASGI raw path.
+            request.scope["raw_path"] = raw_path[4:]
+    return await call_next(request)
 
 # Initialize services
 def init_services():
@@ -154,8 +186,14 @@ def init_services():
         # Attach analytics service to router (derives metrics from state_service)
         router.analytics_service = AnalyticsService(state_service)
 
-        # Attach leaderboard service (SQLite-backed persistence)
-        leaderboard_db = os.path.join(PROJECT_ROOT, "leaderboard.db")
+        # Attach leaderboard service. Vercel's project filesystem is
+        # read-only, so the default serverless path is its writable /tmp
+        # scratch space. LEADERBOARD_DB_PATH can override the path when the
+        # deployment provides a suitable persistent filesystem.
+        leaderboard_db = get_leaderboard_db_path()
+        leaderboard_parent = os.path.dirname(leaderboard_db)
+        if leaderboard_parent:
+            os.makedirs(leaderboard_parent, exist_ok=True)
         router.leaderboard_service = LeaderboardService(db_path=leaderboard_db)
 
         logger.info("Services initialized successfully")
@@ -174,13 +212,15 @@ async def startup_event():
 # Include API routes
 app.include_router(router)
 
-# Mount static files for the frontend
-app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")
-
-# Mount static files for media (videos, audio, etc.) directly to subdirs
-# Use absolute paths to avoid ambiguity
-media_audio_dir = os.path.join(PROJECT_ROOT, "public", "media", "audio")
-media_videos_dir = os.path.join(PROJECT_ROOT, "public", "media", "videos")
+# Mount static files for media (videos, audio, etc.) before the catch-all UI
+# mount so generated media requests are not swallowed by StaticFiles("/").
+# Generated media uses the writable runtime directory on Vercel.
+media_public_root = get_media_public_root()
+media_audio_dir = os.path.join(media_public_root, "audio")
+media_videos_dir = os.path.join(media_public_root, "videos")
 
 app.mount("/media/audio", StaticFiles(directory=media_audio_dir, check_dir=False), name="media_audio")
 app.mount("/media/videos", StaticFiles(directory=media_videos_dir, check_dir=False), name="media_videos")
+
+# Mount static files for the frontend last; this is the catch-all route.
+app.mount("/", StaticFiles(directory="ui/public", html=True), name="ui")

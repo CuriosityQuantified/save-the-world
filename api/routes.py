@@ -452,10 +452,12 @@ async def debug_media_check(request: Request):
     import os
     from starlette.routing import Mount
     from fastapi.staticfiles import StaticFiles
-    from api.app import PROJECT_ROOT  # Import PROJECT_ROOT from app.py
+    from utils.media import get_media_public_root
+    from utils.runtime_paths import get_project_root
     
-    # Define base media directory using PROJECT_ROOT
-    media_base_dir = os.path.join(PROJECT_ROOT, "public", "media")
+    # Define the base media directory using the same runtime path as the
+    # static mounts. On Vercel this resolves to writable /tmp storage.
+    media_base_dir = get_media_public_root()
     
     # Check video directory
     video_dir = os.path.join(media_base_dir, "videos")
@@ -532,6 +534,6 @@ async def debug_media_check(request: Request):
             "audio": audios
         },
         "configured_static_mounts": static_mounts,
-        "project_root": PROJECT_ROOT,
+        "project_root": get_project_root(),
         "working_directory": os.getcwd() # Keep reporting CWD for context
     } 

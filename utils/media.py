@@ -7,18 +7,28 @@ import shutil
 import logging
 import datetime
 
+from utils.runtime_paths import get_media_public_root, get_project_root
+
 logger = logging.getLogger(__name__)
 
-# Define project root relative to this file's location (utils/media.py -> root)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MEDIA_PUBLIC_ROOT = os.path.join(PROJECT_ROOT, 'public', 'media')
+# Define project root relative to this file's location (utils/media.py -> root).
+# Keep these constants for callers that import them, but resolve paths through
+# the helpers below so test/deployment environment overrides are honored.
+PROJECT_ROOT = get_project_root()
+MEDIA_PUBLIC_ROOT = get_media_public_root()
+
+
+def _media_public_root():
+    """Resolve the current writable directory backing generated media."""
+    return get_media_public_root()
 
 def ensure_media_directories():
     """
     Ensure that the required public media directories exist using absolute paths.
     """
-    public_video_dir = os.path.join(MEDIA_PUBLIC_ROOT, 'videos')
-    public_audio_dir = os.path.join(MEDIA_PUBLIC_ROOT, 'audio')
+    media_public_root = _media_public_root()
+    public_video_dir = os.path.join(media_public_root, 'videos')
+    public_audio_dir = os.path.join(media_public_root, 'audio')
     
     os.makedirs(public_video_dir, exist_ok=True)
     os.makedirs(public_audio_dir, exist_ok=True)
@@ -45,10 +55,10 @@ def save_media_file(content, file_type, filename):
     
     # Determine public directory (absolute path) and URL subpath
     if file_type == 'video':
-        public_dir = os.path.join(MEDIA_PUBLIC_ROOT, 'videos')
+        public_dir = os.path.join(_media_public_root(), 'videos')
         media_subdir = 'videos'
     else:  # audio
-        public_dir = os.path.join(MEDIA_PUBLIC_ROOT, 'audio')
+        public_dir = os.path.join(_media_public_root(), 'audio')
         media_subdir = 'audio'
     
     # Construct absolute path for saving
