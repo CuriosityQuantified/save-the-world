@@ -12,9 +12,9 @@ import os
 import time
 import asyncio
 import traceback
-from langchain.chains import LLMChain
 from langchain_groq import ChatGroq
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from models.simulation import LLMLog
 
 # Import all prompt-related constants and functions
@@ -310,12 +310,10 @@ class LLMService:
                 # Always use moonshotai/kimi-k2-instruct via LangChain
                 logger.info(f"Using Groq model via LangChain: {model_name}")
                 llm = self._get_llm_instance(model_name)
-                chain = LLMChain(
-                    llm=llm,
-                    prompt=PromptTemplate.from_template("{prompt}"))
+                chain = PromptTemplate.from_template("{prompt}") | llm | StrOutputParser()
 
                 start_time = time.time()
-                response = await chain.arun(prompt=formatted_prompt)
+                response = await chain.ainvoke({"prompt": formatted_prompt})
                 result = response
                 response_time = time.time() - start_time
                 model_used = model_name
@@ -472,9 +470,9 @@ class LLMService:
             # Ensure the prompt template is correctly initialized for the chain
             # The input_variables should match what VIDEO_PROMPT_TEMPLATE expects, which is 'scenario'
             chain_prompt = PromptTemplate(input_variables=["scenario"], template=prompt_template)
-            chain = LLMChain(llm=groq_llm, prompt=chain_prompt)
+            chain = chain_prompt | groq_llm | StrOutputParser()
 
-            raw_llm_output = await chain.arun(scenario=scenario_text)
+            raw_llm_output = await chain.ainvoke({"scenario": scenario_text})
             end_time = time.time()
             response_time = end_time - start_time
             logger.info(

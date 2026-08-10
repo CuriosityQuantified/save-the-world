@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 import json
 import os
 
@@ -10,6 +10,19 @@ import os
 from services.llm_service import LLMService
 from models.simulation import LLMLog
 from prompts.scenario_generation_prompt import FINAL_CONCLUSION_EXAMPLE_JSON # For structure reference
+
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
+
+
+def _fake_llm_returning(canned_str):
+    """Offline stand-in for a ChatGroq LLM in an LCEL chain.
+
+    Returned as the ``_get_llm_instance`` value so that
+    ``prompt | fake | StrOutputParser()`` composes and ``.ainvoke(...)``
+    resolves to ``canned_str`` (StrOutputParser reads AIMessage.content).
+    """
+    return RunnableLambda(lambda _prompt_value: AIMessage(content=canned_str))
 
 # Mock HuggingFaceService if it's a required dependency for LLMService instantiation
 class MockHuggingFaceService:
@@ -61,9 +74,13 @@ async def test_create_idea_final_turn_conclusion_parsing():
 ```
     """
 
-    # Patch the actual code path: create_idea drives the LLM via LangChain's
-    # LLMChain.arun (with a ChatGroq instance), NOT service.groq_client.
-    with patch("langchain.chains.LLMChain.arun", new_callable=AsyncMock, return_value=messy_llm_response_str):
+    # Patch the actual code path: create_idea drives the LLM via an LCEL chain
+    # (prompt | llm | StrOutputParser()) built on the _get_llm_instance ChatGroq
+    # instance, NOT service.groq_client. Mock that instance offline.
+    with patch.object(
+        service, "_get_llm_instance",
+        return_value=_fake_llm_returning(messy_llm_response_str),
+    ):
         generated_scenario = await service.create_idea(final_turn_context)
 
     # Assertions -- create_idea returns a single dict for the conclusion turn.
@@ -114,8 +131,12 @@ async def test_create_idea_final_turn_fallback_parsing():
     # Simulate LLM response with leading garbage and no markdown, forcing find {' '}'
     messy_llm_response_str = f"Some unexpected text before the JSON... \n {json.dumps(mock_llm_output_json)} \n ...and some after."
 
-    # Patch the actual code path: LLMChain.arun drives the LLM, not service.groq_client.
-    with patch("langchain.chains.LLMChain.arun", new_callable=AsyncMock, return_value=messy_llm_response_str):
+    # Patch the actual code path: the LCEL chain drives the LLM offline via the
+    # mocked _get_llm_instance, not service.groq_client.
+    with patch.object(
+        service, "_get_llm_instance",
+        return_value=_fake_llm_returning(messy_llm_response_str),
+    ):
         generated_scenario = await service.create_idea(final_turn_context)
 
     assert generated_scenario is not None
