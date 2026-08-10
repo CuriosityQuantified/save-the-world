@@ -39,6 +39,8 @@ jobs:
         run: pytest tests/unit/test_nested_test_discovery_regression.py -q
       - name: Run LLMChain LCEL migration regression
         run: pytest tests/unit/test_llmchain_lcel_migration_regression.py -q
+      - name: Run print/logging regression
+        run: pytest tests/unit/test_no_print_media_service_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them).
