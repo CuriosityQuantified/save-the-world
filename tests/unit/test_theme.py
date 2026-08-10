@@ -6,9 +6,30 @@ setting/flavor and visual style — never grading — so difficulty stays balanc
 across themes.
 """
 import re
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
+
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
+
+
+def _capturing_fake_llm(canned_output):
+    """Offline LCEL LLM stand-in that records the formatted prompt string.
+
+    Returned from a mocked ``_get_llm_instance`` so the real code builds
+    ``prompt | fake | StrOutputParser()``. ``captured['forwarded']`` holds the
+    fully-rendered prompt text (equivalent to what the old LLMChain.arun
+    received as its input variables), letting theme assertions inspect what
+    reached the LLM without any network call.
+    """
+    captured = {"forwarded": None}
+
+    def _run(prompt_value):
+        captured["forwarded"] = prompt_value.to_string()
+        return AIMessage(content=canned_output)
+
+    return RunnableLambda(_run), captured
 
 from models.simulation import (
     ThemeType,
@@ -142,16 +163,13 @@ class TestThemeVideoPrompt:
         service = self._make_service()
         service.log_interaction = AsyncMock()
 
-        # Offline chain: mock the LLM instance and the LLMChain used inside.
-        fake_chain = MagicMock()
-        fake_chain.arun = AsyncMock(
-            return_value='{"scenes": ["a", "b", "c", "d"]}'
-        )
+        # Offline LCEL chain: mock the LLM instance; the real code composes
+        # prompt | llm | StrOutputParser() around it.
+        fake_llm, captured = _capturing_fake_llm('{"scenes": ["a", "b", "c", "d"]}')
 
         visual_style = get_theme_instructions("scifi")["visual_style"]
 
-        with patch.object(service, "_get_llm_instance", return_value=MagicMock()), \
-             patch("services.llm_service.LLMChain", return_value=fake_chain):
+        with patch.object(service, "_get_llm_instance", return_value=fake_llm):
             scenes = await service.create_video_prompt(
                 {"situation_description": "A crisis unfolds."},
                 turn_number=1,
@@ -161,8 +179,7 @@ class TestThemeVideoPrompt:
         assert scenes == ["a", "b", "c", "d"]
 
         # The visual style must reach the LLM chain input.
-        chain_kwargs = fake_chain.arun.call_args.kwargs
-        forwarded = chain_kwargs.get("scenario", "")
+        forwarded = captured["forwarded"] or ""
         assert visual_style in forwarded, (
             "Theme visual style must be forwarded to the video-prompt LLM chain."
         )
@@ -176,20 +193,16 @@ class TestThemeVideoPrompt:
         service = self._make_service()
         service.log_interaction = AsyncMock()
 
-        fake_chain = MagicMock()
-        fake_chain.arun = AsyncMock(
-            return_value='{"scenes": ["a", "b", "c", "d"]}'
-        )
+        fake_llm, captured = _capturing_fake_llm('{"scenes": ["a", "b", "c", "d"]}')
 
-        with patch.object(service, "_get_llm_instance", return_value=MagicMock()), \
-             patch("services.llm_service.LLMChain", return_value=fake_chain):
+        with patch.object(service, "_get_llm_instance", return_value=fake_llm):
             await service.create_video_prompt(
                 {"situation_description": "A crisis unfolds."},
                 turn_number=1,
                 theme="classic",
             )
 
-        forwarded = fake_chain.arun.call_args.kwargs.get("scenario", "")
+        forwarded = captured["forwarded"] or ""
         assert "THEME VISUAL STYLE" not in forwarded
 
 
@@ -211,16 +224,14 @@ class TestThemeScenarioFlavor:
         service = self._make_service()
         service.log_interaction = AsyncMock()
 
-        fake_chain = MagicMock()
-        fake_chain.arun = AsyncMock(return_value="{}")  # parsing result is irrelevant
+        fake_llm, captured = _capturing_fake_llm("{}")  # parsing result is irrelevant
 
         flavor = get_theme_instructions("scifi")["scenario_flavor"]
 
-        with patch.object(service, "_get_llm_instance", return_value=MagicMock()), \
-             patch("services.llm_service.LLMChain", return_value=fake_chain):
+        with patch.object(service, "_get_llm_instance", return_value=fake_llm):
             await service.create_idea({"current_turn_number": 1, "theme": "scifi"})
 
-        forwarded = fake_chain.arun.call_args.kwargs.get("prompt", "")
+        forwarded = captured["forwarded"] or ""
         assert flavor in forwarded, (
             "Theme scenario flavor must be forwarded to the scenario-generation LLM."
         )
@@ -230,12 +241,10 @@ class TestThemeScenarioFlavor:
         service = self._make_service()
         service.log_interaction = AsyncMock()
 
-        fake_chain = MagicMock()
-        fake_chain.arun = AsyncMock(return_value="{}")
+        fake_llm, captured = _capturing_fake_llm("{}")
 
-        with patch.object(service, "_get_llm_instance", return_value=MagicMock()), \
-             patch("services.llm_service.LLMChain", return_value=fake_chain):
+        with patch.object(service, "_get_llm_instance", return_value=fake_llm):
             await service.create_idea({"current_turn_number": 1, "theme": "classic"})
 
-        forwarded = fake_chain.arun.call_args.kwargs.get("prompt", "")
+        forwarded = captured["forwarded"] or ""
         assert "THEME (setting)" not in forwarded
