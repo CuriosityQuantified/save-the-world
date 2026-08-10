@@ -35,6 +35,8 @@ jobs:
         run: pytest tests/unit/test_uvicorn_reload_regression.py -q
       - name: Run LLM service final-turn parsing regression
         run: pytest tests/unit/test_llm_service.py::test_create_idea_final_turn_conclusion_parsing tests/unit/test_llm_service.py::test_create_idea_final_turn_fallback_parsing -q
+      - name: Run nested test discovery regression
+        run: pytest tests/unit/test_nested_test_discovery_regression.py -q
       - name: Run unit tests
         # Deselect known-broken tests that are tracked by their own open issues
         # (leave them for those issue-workers; don't scope-creep or race them).
